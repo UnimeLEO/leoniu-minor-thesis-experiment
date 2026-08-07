@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Writing Task with Keystroke Logging</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    max-width: 760px;
+    margin: 40px auto;
+    line-height: 1.4;
+  }
+
+  .panel {
+    border: 1px solid #ccc;
+    padding: 20px;
+    border-radius: 8px;
+  }
+
+  h2 {
+    margin-top: 0;
+  }
+
+  label {
+    display: block;
+    margin-top: 12px;
+    margin-bottom: 4px;
+    font-weight: bold;
+  }
+
+  input[type="text"],
+  input[type="number"],
+  textarea {
+    width: 100%;
+    box-sizing: border-box;
+    font-size: 16px;
+    padding: 10px;
+  }
+
+  textarea {
+    height: 280px;
+    resize: vertical;
+  }
+
+  #statusBar {
+    margin-top: 8px;
+    font-size: 13px;
+    color: #777;
+  }
+
+  .controls {
+    margin-top: 16px;
+  }
+
+  button {
+    padding: 10px 16px;
+    font-size: 16px;
+    margin-right: 8px;
+    margin-top: 8px;
+  }
+
+  .hidden {
+    display: none;
+  }
+</style>
+</head>
+<body>
+
+<div class="panel" id="setupPage">
+  <h2>Participant Information</h2>
+
+  <label for="subjectCode">Subject code</label>
+  <input type="text" id="subjectCode" placeholder="e.g., p001">
+
+  <label for="topicWord">Topic word</label>
+  <input type="text" id="topicWord" placeholder="e.g., travel">
+
+  <label for="timeLimitMin">Time limit (minutes)</label>
+  <input type="number" id="timeLimitMin" min="1" step="1" value="30" placeholder="e.g., 30">
+
+  <div class="controls">
+    <button id="continueBtn">Continue</button>
+  </div>
+</div>
+
+<div class="panel hidden" id="writingPage">
+  <h2>Writing Task</h2>
+
+  <textarea
+    id="writingBox"
+    disabled
+    spellcheck="false"
+    autocomplete="off"
+    autocorrect="off"
+    autocapitalize="off"
+    placeholder="The writing box will be enabled after you press Start."></textarea>
+
+  <div id="statusBar">
+    <span id="timer">Time remaining: 30:00</span>
+    <span> | </span>
+    <span id="wordCount">Word count: 0</span>
+  </div>
+
+  <div class="controls">
+    <button id="startBtn">Start</button>
+    <button id="stopBtn" disabled>Stop</button>
+    <button id="downloadCSVBtn" disabled>Download CSV</button>
+    <button id="downloadTXTBtn" disabled>Download Final TXT</button>
+    <button id="downloadMinuteTXTBtn" disabled>Download Minute TXT</button>
+  </div>
+</div>
+
+<script>
+  const setupPage = document.getElementById("setupPage");
+  const writingPage = document.getElementById("writingPage");
+
+  const subjectCodeInput = document.getElementById("subjectCode");
+  const topicWordInput = document.getElementById("topicWord");
+  const timeLimitMinInput = document.getElementById("timeLimitMin");
+
+  const continueBtn = document.getElementById("continueBtn");
+
+  const writingBox = document.getElementById("writingBox");
+  const timerDisplay = document.getElementById("timer");
+  const wordCountDisplay = document.getElementById("wordCount");
+
+  const startBtn = document.getElementById("startBtn");
+  const stopBtn = document.getElementById("stopBtn");
+  const downloadCSVBtn = document.getElementById("downloadCSVBtn");
+  const downloadTXTBtn = document.getElementById("downloadTXTBtn");
+  const downloadMinuteTXTBtn = document.getElementById("downloadMinuteTXTBtn");
+
+  let started = false;
+  let finished = false;
+  let startTime = null;
+  let timerInterval = null;
+  let timeLimitMs = null;
+  let keystrokeLog = [];
+  let minuteSnapshots = [];
+  let lastSnapshotMinute = 0;
+
+  function nowMs() {
+    return performance.now();
+  }
+
+  function elapsedMs() {
+    return nowMs() - startTime;
+  }
+
+  function formatRemaining(ms) {
+    const safeMs = Math.max(0, ms);
+    const totalSeconds = Math.ceil(safeMs / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return String(minutes).padStart(2, "0") + ":" + String(seconds).padStart(2, "0");
+  }
+
+  function sanitizeFilename(name) {
+    return String(name || "")
+      .trim()
+      .replace(/\s+/g, "_")
+      .replace(/[^a-zA-Z0-9_-]/g, "_");
+  }
+
+  function countWords(text) {
+    const trimmed = text.trim();
+    if (!trimmed) return 0;
+    return trimmed.split(/\s+/).length;
+  }
+
+  function getCurrentWordCount() {
+    return countWords(writingBox.value);
+  }
+
+  function updateWordCountDisplay() {
+    wordCountDisplay.textContent = "Word count: " + getCurrentWordCount();
+  }
+
+  function validateSetup() {
+    const subjectCode = subjectCodeInput.value.trim();
+    const topicWord = topicWordInput.value.trim();
+    const timeLimitMin = Number(timeLimitMinInput.value);
+
+    if (!subjectCode) {
+      alert("Please enter a subject code.");
+      return false;
+    }
+
+    if (!topicWord) {
+      alert("Please enter a topic word.");
+      return false;
+    }
+
+    if (!Number.isFinite(timeLimitMin) || timeLimitMin <= 0) {
+      alert("Please enter a valid time limit in minutes.");
+      return false;
+    }
+
+    return true;
+  }
+
+  function updateInitialStatus() {
+    const mins = Number(timeLimitMinInput.value);
+    if (Number.isFinite(mins) && mins > 0) {
+      timerDisplay.textContent = "Time remaining: " + formatRemaining(mins * 60 * 1000);
+    }
+    updateWordCountDisplay();
+  }
+
+  function addLog(eventType, key, inputType, data) {
+    keystrokeLog.push({
+      subject_code: subjectCodeInput.value.trim(),
+      topic_word: topicWordInput.value.trim(),
+      time_ms: elapsedMs().toFixed(2),
+      event: eventType,
+      key: key || "",
+      inputType: inputType || "",
+      data: data || "",
+      cursor_start: writingBox.selectionStart,
+      cursor_end: writingBox.selectionEnd,
+      word_count: getCurrentWordCount()
+    });
+  }
+
+  function recordMinuteSnapshotsUpToCurrentTime() {
+    if (!started) return;
+
+    const completedMinutes = Math.floor(elapsedMs() / 60000);
+
+    while (lastSnapshotMinute < completedMinutes) {
+      lastSnapshotMinute += 1;
+      minuteSnapshots.push({
+        minute: lastSnapshotMinute,
+        word_count: getCurrentWordCount(),
+        text: writingBox.value
+      });
+    }
+  }
+
+  function updateTimer() {
+    if (!started) return;
+
+    recordMinuteSnapshotsUpToCurrentTime();
+
+    const remaining = timeLimitMs - elapsedMs();
+    timerDisplay.textContent = "Time remaining: " + formatRemaining(remaining);
+
+    if (remaining <= 0) {
+      stopTask(true);
+    }
+  }
+
+  function goToWritingPage() {
+    if (!validateSetup()) return;
+
+    setupPage.classList.add("hidden");
+    writingPage.classList.remove("hidden");
+    updateInitialStatus();
+  }
+
+  function startTask() {
+    if (started) return;
+
+    started = true;
+    finished = false;
+    startTime = nowMs();
+    timeLimitMs = Number(timeLimitMinInput.value) * 60 * 1000;
+    keystrokeLog = [];
+    minuteSnapshots = [];
+    lastSnapshotMinute = 0;
+
+    writingBox.value = "";
+    writingBox.disabled = false;
+    writingBox.focus();
+    updateWordCountDisplay();
+
+    startBtn.disabled = true;
+    stopBtn.disabled = false;
+    downloadCSVBtn.disabled = true;
+    downloadTXTBtn.disabled = true;
+    downloadMinuteTXTBtn.disabled = true;
+
+    keystrokeLog.push({
+      subject_code: subjectCodeInput.value.trim(),
+      topic_word: topicWordInput.value.trim(),
+      time_ms: "0.00",
+      event: "task_start",
+      key: "",
+      inputType: "",
+      data: "",
+      cursor_start: 0,
+      cursor_end: 0,
+      word_count: 0
+    });
+
+    timerDisplay.textContent = "Time remaining: " + formatRemaining(timeLimitMs);
+    timerInterval = setInterval(updateTimer, 200);
+  }
+
+  function stopTask(autoStopped = false) {
+    if (!started) return;
+
+    recordMinuteSnapshotsUpToCurrentTime();
+    addLog(autoStopped ? "task_end_time_limit" : "task_end", "", "", "");
+
+    started = false;
+    finished = true;
+
+    clearInterval(timerInterval);
+    writingBox.disabled = true;
+
+    startBtn.disabled = true;
+    stopBtn.disabled = true;
+    downloadCSVBtn.disabled = false;
+    downloadTXTBtn.disabled = false;
+    downloadMinuteTXTBtn.disabled = false;
+
+    timerDisplay.textContent = autoStopped
+      ? "Time remaining: 00:00"
+      : "Task stopped";
+
+    updateWordCountDisplay();
+  }
+
+  function makeCSV() {
+    const headers = [
+      "subject_code",
+      "topic_word",
+      "time_ms",
+      "event",
+      "key",
+      "inputType",
+      "data",
+      "cursor_start",
+      "cursor_end",
+      "word_count"
+    ];
+
+    function escapeCSV(value) {
+      const str = String(value ?? "");
+      return '"' + str.replace(/"/g, '""') + '"';
+    }
+
+    const rows = keystrokeLog.map(row =>
+      headers.map(h => escapeCSV(row[h])).join(",")
+    );
+
+    return headers.join(",") + "\n" + rows.join("\n");
+  }
+
+  function makeMinuteSnapshotTXT() {
+    const subjectCode = subjectCodeInput.value.trim();
+    const topicWord = topicWordInput.value.trim();
+    const lines = [];
+
+    lines.push("Subject code: " + subjectCode);
+    lines.push("Topic word: " + topicWord);
+    lines.push("");
+
+    if (minuteSnapshots.length === 0) {
+      lines.push("No full-minute snapshots were recorded.");
+      return lines.join("\n");
+    }
+
+    minuteSnapshots.forEach(snapshot => {
+      lines.push("=== Minute " + snapshot.minute + " ===");
+      lines.push("Word count: " + snapshot.word_count);
+      lines.push("");
+      lines.push(snapshot.text);
+      lines.push("");
+    });
+
+    return lines.join("\n");
+  }
+
+  function downloadFile(content, filename, mimeType) {
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function getBaseFilename() {
+    const subjectCode = sanitizeFilename(subjectCodeInput.value.trim() || "participant");
+    const topicWord = sanitizeFilename(topicWordInput.value.trim() || "topic");
+    return subjectCode + "_" + topicWord;
+  }
+
+  function downloadCSV() {
+    if (!finished) return;
+    const base = getBaseFilename();
+    const csvContent = makeCSV();
+    downloadFile(csvContent, base + "_keystroke_log.csv", "text/csv");
+  }
+
+  function downloadTXT() {
+    if (!finished) return;
+    const base = getBaseFilename();
+    const txtContent = writingBox.value;
+    downloadFile(txtContent, base + "_final_text.txt", "text/plain");
+  }
+
+  function downloadMinuteTXT() {
+    if (!finished) return;
+    const base = getBaseFilename();
+    const minuteTxtContent = makeMinuteSnapshotTXT();
+    downloadFile(minuteTxtContent, base + "_minute_snapshots.txt", "text/plain");
+  }
+
+  continueBtn.addEventListener("click", goToWritingPage);
+
+  startBtn.addEventListener("click", startTask);
+  stopBtn.addEventListener("click", () => stopTask(false));
+  downloadCSVBtn.addEventListener("click", downloadCSV);
+  downloadTXTBtn.addEventListener("click", downloadTXT);
+  downloadMinuteTXTBtn.addEventListener("click", downloadMinuteTXT);
+
+  writingBox.addEventListener("keydown", function(e) {
+    if (!started) return;
+    addLog("keydown", e.key, "", "");
+  });
+
+  writingBox.addEventListener("beforeinput", function(e) {
+    if (!started) return;
+    addLog("beforeinput", "", e.inputType, e.data);
+  });
+
+  writingBox.addEventListener("input", function(e) {
+    if (!started) return;
+    updateWordCountDisplay();
+    addLog("input", "", e.inputType, e.data);
+  });
+
+  timeLimitMinInput.addEventListener("input", updateInitialStatus);
+</script>
+
+</body>
+</html>
