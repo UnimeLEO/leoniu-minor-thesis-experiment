@@ -1,0 +1,947 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Minor Thesis Experiment – Condition Router Prototype</title>
+<style>
+  * { box-sizing: border-box; }
+
+  body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    background: #f5f5f5;
+    color: #111;
+  }
+
+  .page-wrap {
+    max-width: 1400px;
+    margin: 24px auto;
+    padding: 0 20px;
+  }
+
+  .panel {
+    background: #fff;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+  }
+
+  #setupPage {
+    max-width: 760px;
+    margin: 40px auto;
+    padding: 24px;
+  }
+
+  h2 { margin-top: 0; }
+
+  label {
+    display: block;
+    margin-top: 12px;
+    margin-bottom: 4px;
+    font-weight: bold;
+  }
+
+  input[type="text"],
+  textarea {
+    width: 100%;
+    font-size: 16px;
+    padding: 10px;
+  }
+
+  .controls { margin-top: 16px; }
+
+  button {
+    padding: 10px 16px;
+    font-size: 15px;
+    margin-right: 8px;
+    margin-top: 8px;
+    cursor: pointer;
+  }
+
+  button:disabled { cursor: not-allowed; }
+
+  .hidden { display: none !important; }
+
+  #experimentPage.single {
+    max-width: 860px;
+    margin: 0 auto;
+  }
+
+  #experimentPage.dual {
+    display: grid;
+    grid-template-columns: minmax(360px, 0.9fr) minmax(500px, 1.1fr);
+    gap: 18px;
+    align-items: stretch;
+  }
+
+  .task-panel {
+    min-height: 720px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .panel-header {
+    padding: 16px 18px;
+    border-bottom: 1px solid #ddd;
+    background: #fafafa;
+  }
+
+  .panel-header h2 {
+    margin: 0 0 4px 0;
+    font-size: 21px;
+  }
+
+  .subtle {
+    font-size: 13px;
+    color: #666;
+  }
+
+  .phase-banner {
+    padding: 11px 16px;
+    border-bottom: 1px solid #ddd;
+    background: #fff;
+    font-size: 14px;
+  }
+
+  .phase-banner strong { margin-right: 8px; }
+
+  /* AI */
+  #chatMessages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    background: #fff;
+  }
+
+  .msg {
+    max-width: 88%;
+    margin-bottom: 12px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    white-space: pre-wrap;
+    line-height: 1.4;
+  }
+
+  .msg.user {
+    margin-left: auto;
+    background: #ececec;
+  }
+
+  .msg.ai {
+    margin-right: auto;
+    background: #f7f7f7;
+    border: 1px solid #ddd;
+  }
+
+  .chat-input-wrap {
+    border-top: 1px solid #ddd;
+    padding: 12px;
+    background: #fafafa;
+  }
+
+  #promptBox {
+    min-height: 84px;
+    resize: vertical;
+  }
+
+  .chat-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  /* Writing */
+  .writing-body {
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+  }
+
+  #taskInfo {
+    margin-bottom: 12px;
+    padding: 12px;
+    background: #fafafa;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+  }
+
+  #topicText {
+    margin-top: 8px;
+    line-height: 1.5;
+  }
+
+  #planningInstruction {
+    margin-bottom: 12px;
+    padding: 12px;
+    background: #fafafa;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+  }
+
+  #writingBox {
+    flex: 1;
+    min-height: 390px;
+    resize: vertical;
+    line-height: 1.5;
+  }
+
+  #statusBar {
+    margin-top: 8px;
+    font-size: 13px;
+    color: #777;
+  }
+
+  .status-row {
+    display: flex;
+    gap: 18px;
+    flex-wrap: wrap;
+  }
+
+  @media (max-width: 900px) {
+    #experimentPage.dual {
+      grid-template-columns: 1fr;
+    }
+    .task-panel { min-height: 600px; }
+  }
+</style>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+</head>
+<body>
+<div class="page-wrap">
+
+  <div class="panel" id="setupPage">
+    <h2>Participant Information</h2>
+
+    <label for="subjectCode">Subject code</label>
+    <input type="text" id="subjectCode" placeholder="e.g., p001">
+
+    <label for="topicCode">Topic code</label>
+    <input type="text" id="topicCode" maxlength="2" placeholder="e.g., ah">
+
+    <div class="controls">
+      <button id="continueBtn">Continue</button>
+    </div>
+  </div>
+
+  <div id="experimentPage" class="hidden">
+
+    <!-- AI panel: only used for a* conditions -->
+    <section class="panel task-panel hidden" id="aiPanel">
+      <div class="panel-header">
+        <h2>AI Planning</h2>
+        <div class="subtle">Prototype only – no API is connected yet.</div>
+      </div>
+
+      <div class="phase-banner">
+        <strong>AI planning time:</strong>
+        <span id="aiTimer">10:00</span>
+      </div>
+
+      <div id="chatMessages">
+        <div class="msg ai">AI chat interface ready. This is only a layout test.</div>
+      </div>
+
+      <div class="chat-input-wrap">
+        <textarea id="promptBox" disabled placeholder="AI planning will begin after you press Start Task."></textarea>
+        <div class="chat-controls">
+          <span class="subtle" id="aiStatus">Not started</span>
+          <button id="sendBtn" disabled>Send</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Writing / planning panel -->
+    <section class="panel task-panel" id="writingPanel">
+      <div class="panel-header">
+        <h2>Writing Task</h2>
+        <div class="subtle" id="participantLine"></div>
+      </div>
+
+      <div class="phase-banner">
+        <strong>Current phase:</strong>
+        <span id="phaseName">Not started</span>
+      </div>
+
+      <div class="writing-body">
+        <div id="taskInfo" class="hidden">
+          <strong>Topic</strong>
+          <div id="topicText"></div>
+        </div>
+
+        <div id="planningInstruction" class="hidden"></div>
+
+        <textarea
+          id="writingBox"
+          disabled
+          spellcheck="false"
+          autocomplete="off"
+          autocorrect="off"
+          autocapitalize="off"
+          placeholder="The writing box will be enabled when the writing phase begins."></textarea>
+
+        <div id="statusBar">
+          <div class="status-row">
+            <span id="mainTimer">Time remaining: --:--</span>
+            <span id="wordCount">Word count: 0</span>
+          </div>
+        </div>
+
+        <div class="controls">
+          <button id="startBtn">Start Task</button>
+          <button id="endPlanningBtn" class="hidden" disabled>Finish Planning Early</button>
+          <button id="stopBtn" disabled>Finish</button>
+          <button id="downloadPackageBtn" disabled>Download Data Package (.zip)</button>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<script>
+  // ---------------- CONFIG ----------------
+  const PLANNING_MINUTES = 10;
+  const WRITING_MINUTES = 30;
+
+  // Replace these placeholders later with the final experimental prompts.
+  const TOPICS = {
+    h: "Should university education be free for students?",
+    l: "Should farmers receive lower tax rates than other businesses?"
+  };
+
+  const VALID_CODES = ["ah", "ih", "nh", "al", "il", "nl"];
+
+  // ---------------- DOM ----------------
+  const setupPage = document.getElementById("setupPage");
+  const experimentPage = document.getElementById("experimentPage");
+  const aiPanel = document.getElementById("aiPanel");
+
+  const subjectCodeInput = document.getElementById("subjectCode");
+  const topicCodeInput = document.getElementById("topicCode");
+  const continueBtn = document.getElementById("continueBtn");
+
+  const participantLine = document.getElementById("participantLine");
+  const taskInfo = document.getElementById("taskInfo");
+  const topicText = document.getElementById("topicText");
+  const planningInstruction = document.getElementById("planningInstruction");
+
+  const phaseName = document.getElementById("phaseName");
+  const mainTimer = document.getElementById("mainTimer");
+  const wordCountDisplay = document.getElementById("wordCount");
+
+  const writingBox = document.getElementById("writingBox");
+  const startBtn = document.getElementById("startBtn");
+  const endPlanningBtn = document.getElementById("endPlanningBtn");
+  const stopBtn = document.getElementById("stopBtn");
+  const downloadPackageBtn = document.getElementById("downloadPackageBtn");
+
+  const chatMessages = document.getElementById("chatMessages");
+  const promptBox = document.getElementById("promptBox");
+  const sendBtn = document.getElementById("sendBtn");
+  const aiTimer = document.getElementById("aiTimer");
+  const aiStatus = document.getElementById("aiStatus");
+
+  // ---------------- STATE ----------------
+  let topicCode = "";
+  let planningMode = "";   // a / i / n
+  let familiarity = "";    // h / l
+  let phase = "setup";     // setup / ready / planning / writing / finished
+
+  let phaseStartTime = null;
+  let timerInterval = null;
+  let phaseLimitMs = null;
+
+  let writingStartTime = null;
+  let planningDurationMs = 0;
+  let writingDurationMs = 0;
+  let planningEndReason = "not_applicable";
+  let writingEndReason = "";
+  let keystrokeLog = [];
+  let minuteSnapshots = [];
+  let lastSnapshotMinute = 0;
+  let chatLog = [];
+
+  // ---------------- HELPERS ----------------
+  function nowMs() {
+    return performance.now();
+  }
+
+  function formatRemaining(ms) {
+    const safeMs = Math.max(0, ms);
+    const totalSeconds = Math.ceil(safeMs / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return String(minutes).padStart(2, "0") + ":" + String(seconds).padStart(2, "0");
+  }
+
+  function sanitizeFilename(name) {
+    return String(name || "")
+      .trim()
+      .replace(/\s+/g, "_")
+      .replace(/[^a-zA-Z0-9_-]/g, "_");
+  }
+
+  function countWords(text) {
+    const trimmed = text.trim();
+    if (!trimmed) return 0;
+    return trimmed.split(/\s+/).length;
+  }
+
+  function updateWordCountDisplay() {
+    wordCountDisplay.textContent = "Word count: " + countWords(writingBox.value);
+  }
+
+  function getConditionLabel() {
+    const planNames = { a: "AI planning", i: "Self-planning", n: "No planning" };
+    const famNames = { h: "High familiarity", l: "Low familiarity" };
+    return planNames[planningMode] + " | " + famNames[familiarity];
+  }
+
+  // ---------------- SETUP / ROUTER ----------------
+  function validateSetup() {
+    const subjectCode = subjectCodeInput.value.trim();
+    const code = topicCodeInput.value.trim().toLowerCase();
+
+    if (!subjectCode) {
+      alert("Please enter a subject code.");
+      return false;
+    }
+
+    if (!VALID_CODES.includes(code)) {
+      alert("Please enter a valid topic code: ah, ih, nh, al, il, or nl.");
+      return false;
+    }
+
+    topicCodeInput.value = code;
+    return true;
+  }
+
+  function routeCondition() {
+    if (!validateSetup()) return;
+
+    topicCode = topicCodeInput.value.trim().toLowerCase();
+    planningMode = topicCode[0];
+    familiarity = topicCode[1];
+
+    participantLine.textContent =
+      "Participant: " + subjectCodeInput.value.trim() +
+      " | Code: " + topicCode;
+
+    topicText.textContent = TOPICS[familiarity];
+    taskInfo.classList.add("hidden");
+
+    // Layout
+    if (planningMode === "a") {
+      experimentPage.className = "dual";
+      aiPanel.classList.remove("hidden");
+
+    } else {
+      experimentPage.className = "single";
+      aiPanel.classList.add("hidden");
+
+    }
+
+    // Condition-specific planning message
+    if (planningMode === "i") {
+      planningInstruction.classList.remove("hidden");
+      planningInstruction.textContent =
+        "You will have 10 minutes to plan on the paper provided. " +
+        "The writing box will remain locked until the planning period ends.";
+    } else if (planningMode === "a") {
+      planningInstruction.classList.remove("hidden");
+      planningInstruction.textContent =
+        "You will have 10 minutes to plan using the AI tool. " +
+        "The writing box will remain locked until the AI planning period ends.";
+    } else {
+      planningInstruction.classList.add("hidden");
+      planningInstruction.textContent = "";
+    }
+
+    setupPage.classList.add("hidden");
+    experimentPage.classList.remove("hidden");
+
+    phase = "ready";
+    phaseName.textContent = "Ready";
+    mainTimer.textContent =
+      planningMode === "n"
+        ? "Writing time: 30:00"
+        : "Planning time: 10:00";
+
+    aiTimer.textContent = "10:00";
+    updateWordCountDisplay();
+  }
+
+  // ---------------- PHASE CONTROL ----------------
+  function startTask() {
+    if (phase !== "ready") return;
+
+    // Reveal the assigned topic only when the participant starts the task.
+    taskInfo.classList.remove("hidden");
+
+    startBtn.disabled = true;
+    stopBtn.disabled = true;
+    downloadPackageBtn.disabled = true;
+    planningDurationMs = 0;
+    writingDurationMs = 0;
+    planningEndReason = planningMode === "n" ? "not_applicable" : "";
+    writingEndReason = "";
+    writingBox.value = "";
+    updateWordCountDisplay();
+
+    if (planningMode === "n") {
+      beginWriting();
+    } else {
+      beginPlanning();
+    }
+  }
+
+  function beginPlanning() {
+    phase = "planning";
+    phaseStartTime = nowMs();
+    phaseLimitMs = PLANNING_MINUTES * 60 * 1000;
+
+    phaseName.textContent =
+      planningMode === "a" ? "AI planning" : "Self-planning";
+    mainTimer.textContent = "Planning time: 10:00";
+    writingBox.disabled = true;
+
+    endPlanningBtn.classList.remove("hidden");
+    endPlanningBtn.disabled = false;
+
+    if (planningMode === "a") {
+      promptBox.disabled = false;
+      sendBtn.disabled = false;
+      aiStatus.textContent = "AI planning active";
+      promptBox.focus();
+    }
+
+    clearInterval(timerInterval);
+    timerInterval = setInterval(updatePhaseTimer, 200);
+  }
+
+  function endPlanningEarly() {
+    if (phase !== "planning") return;
+
+    planningDurationMs = nowMs() - phaseStartTime;
+    planningEndReason = "ended_early_by_participant";
+    beginWriting();
+  }
+
+  function beginWriting() {
+    if (planningMode === "n") {
+      planningDurationMs = 0;
+      planningEndReason = "not_applicable";
+    }
+
+    endPlanningBtn.disabled = true;
+    endPlanningBtn.classList.add("hidden");
+
+    phase = "writing";
+    phaseStartTime = nowMs();
+    writingStartTime = phaseStartTime;
+    phaseLimitMs = WRITING_MINUTES * 60 * 1000;
+
+    keystrokeLog = [];
+    minuteSnapshots = [];
+    lastSnapshotMinute = 0;
+
+    phaseName.textContent = "Writing";
+    mainTimer.textContent = "Writing time: 30:00";
+
+    // Lock AI interaction after planning, but keep history visible.
+    promptBox.disabled = true;
+    sendBtn.disabled = true;
+    if (planningMode === "a") {
+      aiStatus.textContent = "AI planning ended — chat is now read-only";
+      aiTimer.textContent = "00:00";
+    }
+
+    writingBox.disabled = false;
+    writingBox.focus();
+    stopBtn.disabled = false;
+
+    keystrokeLog.push({
+      subject_code: subjectCodeInput.value.trim(),
+      topic_code: topicCode,
+      condition: getConditionLabel(),
+      familiarity: familiarity,
+      planning_mode: planningMode,
+      time_ms: "0.00",
+      event: "writing_start",
+      key: "",
+      inputType: "",
+      data: "",
+      cursor_start: 0,
+      cursor_end: 0,
+      word_count: 0
+    });
+
+    clearInterval(timerInterval);
+    timerInterval = setInterval(updatePhaseTimer, 200);
+  }
+
+  function finishTask(autoStopped = false) {
+    if (phase !== "writing") return;
+
+    recordMinuteSnapshotsUpToCurrentTime();
+    addWritingLog(
+      autoStopped ? "writing_end_time_limit" : "writing_end",
+      "", "", ""
+    );
+
+    writingDurationMs = writingElapsedMs();
+    writingEndReason = autoStopped ? "time_limit" : "ended_by_participant";
+
+    phase = "finished";
+    clearInterval(timerInterval);
+
+    writingBox.disabled = true;
+    promptBox.disabled = true;
+    sendBtn.disabled = true;
+    stopBtn.disabled = true;
+
+    phaseName.textContent = "Finished";
+    mainTimer.textContent =
+      autoStopped ? "Writing time: 00:00" : "Task finished";
+
+    downloadPackageBtn.disabled = false;
+  }
+
+  function updatePhaseTimer() {
+    if (phase !== "planning" && phase !== "writing") return;
+
+    const elapsed = nowMs() - phaseStartTime;
+    const remaining = phaseLimitMs - elapsed;
+
+    if (phase === "planning") {
+      mainTimer.textContent = "Planning time: " + formatRemaining(remaining);
+      if (planningMode === "a") {
+        aiTimer.textContent = formatRemaining(remaining);
+      }
+
+      if (remaining <= 0) {
+        planningDurationMs = nowMs() - phaseStartTime;
+        planningEndReason = "time_limit";
+        beginWriting();
+      }
+    } else if (phase === "writing") {
+      recordMinuteSnapshotsUpToCurrentTime();
+      mainTimer.textContent = "Writing time: " + formatRemaining(remaining);
+
+      if (remaining <= 0) {
+        finishTask(true);
+      }
+    }
+  }
+
+  // ---------------- WRITING LOG ----------------
+  function writingElapsedMs() {
+    return nowMs() - writingStartTime;
+  }
+
+  function addWritingLog(eventType, key, inputType, data) {
+    if (phase !== "writing") return;
+
+    keystrokeLog.push({
+      subject_code: subjectCodeInput.value.trim(),
+      topic_code: topicCode,
+      condition: getConditionLabel(),
+      familiarity: familiarity,
+      planning_mode: planningMode,
+      time_ms: writingElapsedMs().toFixed(2),
+      event: eventType,
+      key: key || "",
+      inputType: inputType || "",
+      data: data || "",
+      cursor_start: writingBox.selectionStart,
+      cursor_end: writingBox.selectionEnd,
+      word_count: countWords(writingBox.value)
+    });
+  }
+
+  function recordMinuteSnapshotsUpToCurrentTime() {
+    if (phase !== "writing") return;
+
+    const completedMinutes = Math.floor(writingElapsedMs() / 60000);
+
+    while (lastSnapshotMinute < completedMinutes) {
+      lastSnapshotMinute += 1;
+      minuteSnapshots.push({
+        minute: lastSnapshotMinute,
+        word_count: countWords(writingBox.value),
+        text: writingBox.value
+      });
+    }
+  }
+
+  // ---------------- MOCK AI + CHAT LOG ----------------
+  function addChatMessage(text, role) {
+    const div = document.createElement("div");
+    div.className = "msg " + role;
+    div.textContent = text;
+    chatMessages.appendChild(div);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
+
+  function sendMockPrompt() {
+    if (phase !== "planning" || planningMode !== "a") return;
+
+    const text = promptBox.value.trim();
+    if (!text) return;
+
+    const t = (nowMs() - phaseStartTime).toFixed(2);
+
+    addChatMessage(text, "user");
+    chatLog.push({
+      role: "user",
+      time_ms: t,
+      text: text
+    });
+
+    promptBox.value = "";
+
+    setTimeout(() => {
+      if (phase !== "planning") return;
+
+      const response =
+        "Mock AI response: the condition-routing and timing logic are working. " +
+        "No language model is connected yet.";
+
+      addChatMessage(response, "ai");
+      chatLog.push({
+        role: "assistant",
+        time_ms: (nowMs() - phaseStartTime).toFixed(2),
+        text: response
+      });
+    }, 250);
+  }
+
+  // ---------------- EXPORT ----------------
+  function downloadFile(content, filename, mimeType) {
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function getBaseFilename() {
+    return (
+      sanitizeFilename(subjectCodeInput.value.trim() || "participant") +
+      "_" +
+      sanitizeFilename(topicCode || "condition")
+    );
+  }
+
+  function makeCSV() {
+    const headers = [
+      "subject_code",
+      "topic_code",
+      "condition",
+      "familiarity",
+      "planning_mode",
+      "time_ms",
+      "event",
+      "key",
+      "inputType",
+      "data",
+      "cursor_start",
+      "cursor_end",
+      "word_count"
+    ];
+
+    function escapeCSV(value) {
+      const str = String(value ?? "");
+      return '"' + str.replace(/"/g, '""') + '"';
+    }
+
+    const rows = keystrokeLog.map(row =>
+      headers.map(h => escapeCSV(row[h])).join(",")
+    );
+
+    return headers.join(",") + "\n" + rows.join("\n");
+  }
+
+  function makeMinuteSnapshotTXT() {
+    const lines = [];
+
+    lines.push("Subject code: " + subjectCodeInput.value.trim());
+    lines.push("Topic code: " + topicCode);
+    lines.push("Condition: " + getConditionLabel());
+    lines.push("");
+
+    if (minuteSnapshots.length === 0) {
+      lines.push("No full-minute snapshots were recorded.");
+      return lines.join("\n");
+    }
+
+    minuteSnapshots.forEach(snapshot => {
+      lines.push("=== Minute " + snapshot.minute + " ===");
+      lines.push("Word count: " + snapshot.word_count);
+      lines.push("");
+      lines.push(snapshot.text);
+      lines.push("");
+    });
+
+    return lines.join("\n");
+  }
+
+  function downloadCSV() {
+    if (phase !== "finished") return;
+    downloadFile(makeCSV(), getBaseFilename() + "_keystroke_log.csv", "text/csv");
+  }
+
+  function downloadTXT() {
+    if (phase !== "finished") return;
+    downloadFile(writingBox.value, getBaseFilename() + "_final_text.txt", "text/plain");
+  }
+
+  function downloadMinuteTXT() {
+    if (phase !== "finished") return;
+    downloadFile(
+      makeMinuteSnapshotTXT(),
+      getBaseFilename() + "_minute_snapshots.txt",
+      "text/plain"
+    );
+  }
+
+  function downloadChat() {
+    if (phase !== "finished" || planningMode !== "a") return;
+
+    const payload = {
+      subject_code: subjectCodeInput.value.trim(),
+      topic_code: topicCode,
+      condition: getConditionLabel(),
+      planning_minutes: PLANNING_MINUTES,
+      chat: chatLog
+    };
+
+    downloadFile(
+      JSON.stringify(payload, null, 2),
+      getBaseFilename() + "_chat_log.json",
+      "application/json"
+    );
+  }
+
+
+  function makeMetadataObject() {
+    return {
+      subject_code: subjectCodeInput.value.trim(),
+      topic_code: topicCode,
+      condition: getConditionLabel(),
+      planning_mode: planningMode,
+      familiarity: familiarity,
+      topic: TOPICS[familiarity],
+      planned_planning_limit_seconds:
+        planningMode === "n" ? 0 : PLANNING_MINUTES * 60,
+      actual_planning_time_ms: Number(planningDurationMs.toFixed(2)),
+      actual_planning_time_seconds: Number((planningDurationMs / 1000).toFixed(3)),
+      planning_end_reason: planningEndReason,
+      planned_writing_limit_seconds: WRITING_MINUTES * 60,
+      actual_writing_time_ms: Number(writingDurationMs.toFixed(2)),
+      actual_writing_time_seconds: Number((writingDurationMs / 1000).toFixed(3)),
+      writing_end_reason: writingEndReason,
+      final_word_count: countWords(writingBox.value)
+    };
+  }
+
+  async function downloadDataPackage() {
+    if (phase !== "finished") return;
+
+    if (typeof JSZip === "undefined") {
+      alert("The ZIP library could not be loaded. Please check the internet connection and reload the page.");
+      return;
+    }
+
+    downloadPackageBtn.disabled = true;
+    const originalLabel = downloadPackageBtn.textContent;
+    downloadPackageBtn.textContent = "Preparing ZIP...";
+
+    try {
+      const zip = new JSZip();
+      const base = getBaseFilename();
+
+      zip.file(base + "_final_text.txt", writingBox.value);
+      zip.file(base + "_keystroke_log.csv", makeCSV());
+      zip.file(base + "_minute_snapshots.txt", makeMinuteSnapshotTXT());
+      zip.file(
+        base + "_metadata.json",
+        JSON.stringify(makeMetadataObject(), null, 2)
+      );
+
+      if (planningMode === "a") {
+        const chatPayload = {
+          subject_code: subjectCodeInput.value.trim(),
+          topic_code: topicCode,
+          condition: getConditionLabel(),
+          planning_minutes: PLANNING_MINUTES,
+          chat: chatLog
+        };
+
+        zip.file(
+          base + "_chat_log.json",
+          JSON.stringify(chatPayload, null, 2)
+        );
+      }
+
+      const blob = await zip.generateAsync({
+        type: "blob",
+        compression: "DEFLATE",
+        compressionOptions: { level: 6 }
+      });
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = base + "_data_package.zip";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      alert("Could not create the ZIP file. Please try again.");
+    } finally {
+      downloadPackageBtn.textContent = originalLabel;
+      downloadPackageBtn.disabled = false;
+    }
+  }
+
+  // ---------------- EVENTS ----------------
+  continueBtn.addEventListener("click", routeCondition);
+  startBtn.addEventListener("click", startTask);
+  endPlanningBtn.addEventListener("click", endPlanningEarly);
+  stopBtn.addEventListener("click", () => finishTask(false));
+
+  downloadPackageBtn.addEventListener("click", downloadDataPackage);
+
+  sendBtn.addEventListener("click", sendMockPrompt);
+
+  promptBox.addEventListener("keydown", function(e) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendMockPrompt();
+    }
+  });
+
+  writingBox.addEventListener("keydown", function(e) {
+    if (phase !== "writing") return;
+    addWritingLog("keydown", e.key, "", "");
+  });
+
+  writingBox.addEventListener("beforeinput", function(e) {
+    if (phase !== "writing") return;
+    addWritingLog("beforeinput", "", e.inputType, e.data);
+  });
+
+  writingBox.addEventListener("input", function(e) {
+    if (phase !== "writing") return;
+    updateWordCountDisplay();
+    addWritingLog("input", "", e.inputType, e.data);
+  });
+</script>
+</body>
+</html>
