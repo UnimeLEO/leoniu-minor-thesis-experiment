@@ -106,11 +106,26 @@
   .phase-banner strong { margin-right: 8px; }
 
   /* AI */
+  #aiPanel {
+    height: clamp(650px, calc(100vh - 48px), 820px);
+    min-height: 0;
+    max-height: 820px;
+  }
+
+  #aiPanel .panel-header,
+  #aiPanel .phase-banner,
+  #aiPanel .chat-input-wrap {
+    flex-shrink: 0;
+  }
+
   #chatMessages {
-    flex: 1;
+    flex: 1 1 auto;
+    min-height: 0;
     overflow-y: auto;
+    overflow-x: hidden;
     padding: 16px;
     background: #fff;
+    scrollbar-gutter: stable;
   }
 
   .msg {
@@ -119,6 +134,7 @@
     padding: 10px 12px;
     border-radius: 10px;
     white-space: pre-wrap;
+    overflow-wrap: anywhere;
     line-height: 1.4;
   }
 
@@ -140,7 +156,9 @@
   }
 
   #promptBox {
+    height: 84px;
     min-height: 84px;
+    max-height: 120px;
     resize: vertical;
   }
 
@@ -202,7 +220,16 @@
     #experimentPage.dual {
       grid-template-columns: 1fr;
     }
-    .task-panel { min-height: 600px; }
+
+    .task-panel {
+      min-height: 600px;
+    }
+
+    #aiPanel {
+      height: 650px;
+      min-height: 650px;
+      max-height: 650px;
+    }
   }
 </style>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -306,7 +333,7 @@
 
   // IMPORTANT: Replace this with your deployed Cloudflare Worker URL.
   // Example: https://minor-thesis-ai-proxy.YOUR-SUBDOMAIN.workers.dev
-  const WORKER_URL = "https://mt-ai-proxy.njsukleo.workers.dev";
+  const WORKER_URL = "https://mt-ai-proxy.njsukleo.workers.dev/";
 
   // Replace these placeholders later with the final experimental prompts.
   const TOPICS = {
