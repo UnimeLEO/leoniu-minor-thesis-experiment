@@ -560,7 +560,25 @@
     beginWriting();
   }
 
-  function beginWriting() {
+  
+function hideAiPanelForWriting() {
+  if (planningMode !== "a") return;
+
+  const aiPanel = document.getElementById("aiPanel");
+  if (aiPanel) {
+    aiPanel.style.display = "none";
+  }
+
+  // Switch the experiment layout from two columns to one full-width writing panel.
+  experimentPage.classList.remove("dual");
+
+  // Hard-disable AI interaction once writing starts.
+  promptBox.disabled = true;
+  sendBtn.disabled = true;
+}
+
+function beginWriting() {
+  hideAiPanelForWriting();
     if (planningMode === "n") {
       planningDurationMs = 0;
       planningEndReason = "not_applicable";
@@ -790,11 +808,17 @@
 
       const responseTime = (nowMs() - phaseStartTime).toFixed(2);
 
-      addChatMessage(data.text, "ai");
+      // If planning ended while the request was in flight, do not display
+      // the late response during the writing stage.
+      if (phase === "planning") {
+        addChatMessage(data.text, "ai");
+      }
+
       chatLog.push({
         role: "assistant",
         time_ms: responseTime,
-        text: data.text
+        text: data.text,
+        arrived_after_planning: phase !== "planning"
       });
 
     } catch (error) {
