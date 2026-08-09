@@ -475,7 +475,8 @@
 
   // IMPORTANT: Replace this with your deployed Cloudflare Worker URL.
   // Example: https://minor-thesis-ai-proxy.YOUR-SUBDOMAIN.workers.dev
-  const WORKER_URL = "https://mt-ai-proxy.njsukleo.workers.dev/";
+  // Beta Worker handles access-code authorization and AI proxying.
+  const WORKER_URL = "https://mt-ai-proxy-beta.njsukleo.workers.dev/";
 
   // Replace these placeholders later with the final experimental prompts.
   const TOPICS = {
@@ -483,17 +484,6 @@
     l: "Should farmers receive lower tax rates than other businesses?"
   };
 
-  // BETA ONLY:
-  // These demo access codes are stored in the front end only to test the new routing concept.
-  // They are NOT secure and must be replaced by Cloudflare Worker validation before real use.
-  const BETA_ACCESS_ROUTES = {
-    "K7M2-Q4PX": "ah",
-    "R9VT-3LKC": "ih",
-    "D5WF-8N2Q": "nh",
-    "X3PA-7M6R": "al",
-    "H8QK-2V5T": "il",
-    "N4CZ-9J7W": "nl"
-  };
 
   // ---------------- DOM ----------------
   const setupPage = document.getElementById("setupPage");
@@ -529,6 +519,7 @@
 
   // ---------------- STATE ----------------
   let topicCode = "";       // internal condition code resolved from access code
+  let activeAccessCode = "";   // kept in memory only for this session
   let planningMode = "";   // a / i / n
   let familiarity = "";    // h / l
   let phase = "setup";     // setup / ready / planning / writing / finished
@@ -612,11 +603,11 @@
     accessStatus.className = type;
   }
 
-  function validateSetup() {
+  function validateSetupFields() {
     const subjectCode = getSubjectCode();
     const accessCode = getAccessCode();
 
-    if (!/^P\d{2}$/.test(subjectCode)) {
+    if (!/^P\\d{2}$/.test(subjectCode)) {
       showAccessStatus("Please enter a valid two-digit subject number.", "error");
       subjectNumberInput.focus();
       return false;
@@ -628,21 +619,69 @@
       return false;
     }
 
-    const resolvedCode = BETA_ACCESS_ROUTES[accessCode];
-
-    if (!resolvedCode) {
-      showAccessStatus("Access code not recognised.", "error");
-      return false;
-    }
-
-    topicCode = resolvedCode;
-    showAccessStatus("Access code accepted.", "ok");
     return true;
   }
 
-  function routeCondition() {
-    if (!validateSetup()) return;
+  async function authorizeAccessCode() {
+    if (!validateSetupFields()) return null;
 
+    const accessCode = getAccessCode();
+
+    continueBtn.disabled = true;
+    showAccessStatus("Checking access code...", "");
+
+    try {
+      const response = await fetch(WORKER_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          action: "authorize",
+          access_code: accessCode
+        })
+      });
+
+      let data = null;
+      try {
+        data = await response.json();
+      } catch (_) {
+        data = null;
+      }
+
+      if (!response.ok || !data?.valid || typeof data?.condition !== "string") {
+        showAccessStatus("Access code not recognised.", "error");
+        return null;
+      }
+
+      const condition = data.condition.toLowerCase();
+
+      if (!["ah", "ih", "nh", "al", "il", "nl"].includes(condition)) {
+        showAccessStatus("Access code configuration error.", "error");
+        return null;
+      }
+
+      activeAccessCode = accessCode;
+      showAccessStatus("Access code accepted.", "ok");
+      return condition;
+
+    } catch (error) {
+      showAccessStatus(
+        "Could not verify the access code. Please check the internet connection and try again.",
+        "error"
+      );
+      return null;
+
+    } finally {
+      continueBtn.disabled = false;
+    }
+  }
+
+  async function routeCondition() {
+    const condition = await authorizeAccessCode();
+    if (!condition) return;
+
+    topicCode = condition;
     planningMode = topicCode[0];
     familiarity = topicCode[1];
 
@@ -652,18 +691,15 @@
     topicText.textContent = TOPICS[familiarity];
     taskInfo.classList.add("hidden");
 
-    // Layout
     if (planningMode === "a") {
       experimentPage.className = "dual";
       aiPanel.classList.remove("hidden");
       aiPanel.style.display = "";
-
     } else {
       experimentPage.className = "single";
       aiPanel.classList.add("hidden");
     }
 
-    // Condition-specific planning message
     if (planningMode === "i") {
       planningInstruction.classList.remove("hidden");
       planningInstruction.textContent =
@@ -1033,6 +1069,7 @@ function beginWriting() {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
+          access_code: activeAccessCode,
           messages: buildApiMessages()
         }),
         signal: aiAbortController.signal
@@ -1404,7 +1441,7 @@ function beginWriting() {
   // ---------------- EVENTS ----------------
   continueBtn.addEventListener("click", routeCondition);
   accessCodeBInput.addEventListener("keydown", function(e) {
-    if (e.key === "Enter") {
+    if (e.key === "Enter" && !continueBtn.disabled) {
       e.preventDefault();
       routeCondition();
     }
