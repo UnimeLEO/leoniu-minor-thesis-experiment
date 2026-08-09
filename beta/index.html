@@ -643,6 +643,7 @@
         },
         body: JSON.stringify({
           action: "authorize",
+          subject_code: getSubjectCode(),
           access_code: accessCode
         })
       });
@@ -1074,6 +1075,7 @@ function beginWriting() {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
+          subject_code: getSubjectCode(),
           access_code: activeAccessCode,
           messages: buildApiMessages()
         }),
