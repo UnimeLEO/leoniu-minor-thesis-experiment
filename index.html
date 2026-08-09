@@ -113,6 +113,11 @@
     width: 100%;
     font-size: 16px;
     padding: 10px;
+    font-family: inherit;
+  }
+
+  button {
+    font-family: inherit;
   }
 
   .controls { margin-top: 16px; }
@@ -607,7 +612,7 @@
     const subjectCode = getSubjectCode();
     const accessCode = getAccessCode();
 
-    if (!/^P\\d{2}$/.test(subjectCode)) {
+    if (!/^P\d{2}$/.test(subjectCode)) {
       showAccessStatus("Please enter a valid two-digit subject number.", "error");
       subjectNumberInput.focus();
       return false;
