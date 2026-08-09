@@ -668,6 +668,7 @@
       }
 
       activeAccessCode = accessCode;
+      activeTaskNumber = Number(data.task_number) || null;
       showAccessStatus("Access code accepted.", "ok");
       return condition;
 
@@ -755,13 +756,65 @@
   });
 
   // ---------------- PHASE CONTROL ----------------
-  function startTask() {
+  async function markAssignmentUsed() {
+    const response = await fetch(WORKER_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        action: "mark_used",
+        subject_code: getSubjectCode(),
+        access_code: activeAccessCode
+      })
+    });
+
+    let data = null;
+    try {
+      data = await response.json();
+    } catch (_) {
+      data = null;
+    }
+
+    if (!response.ok || !data?.success) {
+      throw new Error(
+        data?.error ||
+        "Could not confirm the task start."
+      );
+    }
+
+    return data;
+  }
+
+  async function startTask() {
     if (phase !== "ready") return;
 
-    // Reveal the assigned topic only when the participant starts the task.
+    startBtn.disabled = true;
+    startBtn.textContent = "Starting...";
+
+    try {
+      // "Used" means the participant has actually started the task,
+      // not merely passed the access-code screen.
+      const usageResult = await markAssignmentUsed();
+
+      if (activeTaskNumber === null && usageResult?.task_number) {
+        activeTaskNumber = Number(usageResult.task_number);
+      }
+
+    } catch (error) {
+      alert(
+        "The task could not be started because the assignment status " +
+        "could not be confirmed. Please check the internet connection and try again."
+      );
+
+      startBtn.disabled = false;
+      startBtn.textContent = "Start Task";
+      return;
+    }
+
+    // Reveal the assigned topic only after the task start has been confirmed.
     taskInfo.classList.remove("hidden");
 
-    startBtn.disabled = true;
     stopBtn.disabled = true;
     downloadPackageBtn.disabled = true;
     planningDurationMs = 0;
@@ -770,6 +823,8 @@
     writingEndReason = "";
     writingBox.value = "";
     updateWordCountDisplay();
+
+    startBtn.textContent = "Start Task";
 
     if (planningMode === "n") {
       beginWriting();
@@ -870,6 +925,7 @@ function beginWriting() {
     keystrokeLog.push({
       subject_code: getSubjectCode(),
       topic_code: topicCode,
+      task_number: activeTaskNumber,
       assignment_source: "access_code",
       condition: getConditionLabel(),
       familiarity: familiarity,
@@ -953,6 +1009,7 @@ function beginWriting() {
     keystrokeLog.push({
       subject_code: getSubjectCode(),
       topic_code: topicCode,
+      task_number: activeTaskNumber,
       condition: getConditionLabel(),
       familiarity: familiarity,
       planning_mode: planningMode,
@@ -1271,6 +1328,7 @@ function beginWriting() {
     const headers = [
       "subject_code",
       "topic_code",
+      "task_number",
       "condition",
       "familiarity",
       "planning_mode",
@@ -1301,6 +1359,7 @@ function beginWriting() {
 
     lines.push("Subject code: " + getSubjectCode());
     lines.push("Topic code: " + topicCode);
+    lines.push("Task number: " + (activeTaskNumber ?? ""));
     lines.push("Condition: " + getConditionLabel());
     lines.push("");
 
@@ -1345,6 +1404,7 @@ function beginWriting() {
     const payload = {
       subject_code: getSubjectCode(),
       topic_code: topicCode,
+      task_number: activeTaskNumber,
       condition: getConditionLabel(),
       planning_minutes: PLANNING_MINUTES,
       chat: chatLog
@@ -1362,6 +1422,7 @@ function beginWriting() {
     return {
       subject_code: getSubjectCode(),
       topic_code: topicCode,
+      task_number: activeTaskNumber,
       condition: getConditionLabel(),
       planning_mode: planningMode,
       familiarity: familiarity,
@@ -1409,6 +1470,7 @@ function beginWriting() {
         const chatPayload = {
           subject_code: getSubjectCode(),
           topic_code: topicCode,
+          task_number: activeTaskNumber,
           condition: getConditionLabel(),
           planning_minutes: PLANNING_MINUTES,
           ai_provider: "OpenAI",
