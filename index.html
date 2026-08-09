@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Minor Thesis Experiment – Condition Router Prototype (Beta)</title>
+<title>Minor Thesis Experiment – Beta Access Router</title>
 <style>
   * { box-sizing: border-box; }
 
@@ -28,7 +28,75 @@
   #setupPage {
     max-width: 760px;
     margin: 40px auto;
-    padding: 24px;
+    padding: 28px;
+  }
+
+  .setup-intro {
+    margin: 4px 0 20px 0;
+    padding: 14px 16px;
+    background: #fafafa;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    line-height: 1.5;
+  }
+
+  .field-hint {
+    margin-top: 5px;
+    font-size: 12px;
+    color: #666;
+  }
+
+  .access-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    max-width: 430px;
+  }
+
+  .access-row input {
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    text-align: center;
+    font-weight: 600;
+  }
+
+  .access-separator {
+    font-weight: bold;
+    color: #666;
+    user-select: none;
+  }
+
+  #subjectNumber {
+    max-width: 120px;
+    text-align: center;
+    letter-spacing: 0.08em;
+    font-weight: 600;
+  }
+
+  #accessStatus {
+    margin-top: 10px;
+    min-height: 20px;
+    font-size: 13px;
+  }
+
+  #accessStatus.error {
+    color: #8b0000;
+  }
+
+  #accessStatus.ok {
+    color: #1f6b2d;
+  }
+
+  .beta-badge {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 2px 7px;
+    border: 1px solid #bbb;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: normal;
+    color: #555;
+    vertical-align: middle;
   }
 
   h2 { margin-top: 0; }
@@ -278,13 +346,47 @@
 <div class="page-wrap">
 
   <div class="panel" id="setupPage">
-    <h2>Participant Information</h2>
+    <h2>Participant Information <span class="beta-badge">BETA</span></h2>
 
-    <label for="subjectCode">Subject code</label>
-    <input type="text" id="subjectCode" placeholder="e.g., p001">
+    <div class="setup-intro">
+      You are invited to take part in a writing study.
+      Please enter the participant information provided by the researcher before continuing.
+    </div>
 
-    <label for="topicCode">Topic code</label>
-    <input type="text" id="topicCode" maxlength="2" placeholder="e.g., ah">
+    <label for="subjectNumber">Subject code</label>
+    <div class="access-row" style="max-width: 180px;">
+      <span class="access-separator" style="font-size: 18px; color: #111;">P</span>
+      <input
+        type="text"
+        id="subjectNumber"
+        maxlength="2"
+        placeholder="e.g., 01"
+        inputmode="numeric"
+        autocomplete="off"
+        spellcheck="false">
+    </div>
+    <div class="field-hint">Enter the two-digit subject number.</div>
+
+    <label>Access code</label>
+    <div class="access-row">
+      <input
+        type="text"
+        id="accessCodeA"
+        maxlength="4"
+        placeholder=""
+        autocomplete="off"
+        spellcheck="false">
+      <span class="access-separator">–</span>
+      <input
+        type="text"
+        id="accessCodeB"
+        maxlength="4"
+        placeholder=""
+        autocomplete="off"
+        spellcheck="false">
+    </div>
+    <div class="field-hint">Enter the 8-character access code provided by the researcher.</div>
+    <div id="accessStatus"></div>
 
     <div class="controls">
       <button id="continueBtn">Continue</button>
@@ -381,15 +483,27 @@
     l: "Should farmers receive lower tax rates than other businesses?"
   };
 
-  const VALID_CODES = ["ah", "ih", "nh", "al", "il", "nl"];
+  // BETA ONLY:
+  // These demo access codes are stored in the front end only to test the new routing concept.
+  // They are NOT secure and must be replaced by Cloudflare Worker validation before real use.
+  const BETA_ACCESS_ROUTES = {
+    "K7M2-Q4PX": "ah",
+    "R9VT-3LKC": "ih",
+    "D5WF-8N2Q": "nh",
+    "X3PA-7M6R": "al",
+    "H8QK-2V5T": "il",
+    "N4CZ-9J7W": "nl"
+  };
 
   // ---------------- DOM ----------------
   const setupPage = document.getElementById("setupPage");
   const experimentPage = document.getElementById("experimentPage");
   const aiPanel = document.getElementById("aiPanel");
 
-  const subjectCodeInput = document.getElementById("subjectCode");
-  const topicCodeInput = document.getElementById("topicCode");
+  const subjectNumberInput = document.getElementById("subjectNumber");
+  const accessCodeAInput = document.getElementById("accessCodeA");
+  const accessCodeBInput = document.getElementById("accessCodeB");
+  const accessStatus = document.getElementById("accessStatus");
   const continueBtn = document.getElementById("continueBtn");
 
   const participantLine = document.getElementById("participantLine");
@@ -414,7 +528,7 @@
   const aiStatus = document.getElementById("aiStatus");
 
   // ---------------- STATE ----------------
-  let topicCode = "";
+  let topicCode = "";       // internal condition code resolved from access code
   let planningMode = "";   // a / i / n
   let familiarity = "";    // h / l
   let phase = "setup";     // setup / ready / planning / writing / finished
@@ -472,34 +586,68 @@
   }
 
   // ---------------- SETUP / ROUTER ----------------
+  function normaliseSubjectNumber(value) {
+    return String(value || "")
+      .replace(/\D/g, "")
+      .slice(0, 2);
+  }
+
+  function getSubjectCode() {
+    return "P" + subjectNumberInput.value;
+  }
+
+  function normaliseAccessPart(value) {
+    return String(value || "")
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, "")
+      .slice(0, 4);
+  }
+
+  function getAccessCode() {
+    return accessCodeAInput.value + "-" + accessCodeBInput.value;
+  }
+
+  function showAccessStatus(message, type = "") {
+    accessStatus.textContent = message;
+    accessStatus.className = type;
+  }
+
   function validateSetup() {
-    const subjectCode = subjectCodeInput.value.trim();
-    const code = topicCodeInput.value.trim().toLowerCase();
+    const subjectCode = getSubjectCode();
+    const accessCode = getAccessCode();
 
-    if (!subjectCode) {
-      alert("Please enter a subject code.");
+    if (!/^P\d{2}$/.test(subjectCode)) {
+      showAccessStatus("Please enter a valid two-digit subject number.", "error");
+      subjectNumberInput.focus();
       return false;
     }
 
-    if (!VALID_CODES.includes(code)) {
-      alert("Please enter a valid topic code: ah, ih, nh, al, il, or nl.");
+    if (!/^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(accessCode)) {
+      showAccessStatus("Please enter the complete 8-character access code.", "error");
+      accessCodeAInput.focus();
       return false;
     }
 
-    topicCodeInput.value = code;
+    const resolvedCode = BETA_ACCESS_ROUTES[accessCode];
+
+    if (!resolvedCode) {
+      showAccessStatus("Access code not recognised.", "error");
+      return false;
+    }
+
+    topicCode = resolvedCode;
+    showAccessStatus("Access code accepted.", "ok");
     return true;
   }
 
   function routeCondition() {
     if (!validateSetup()) return;
 
-    topicCode = topicCodeInput.value.trim().toLowerCase();
     planningMode = topicCode[0];
     familiarity = topicCode[1];
 
     participantLine.textContent =
-      "Participant: " + subjectCodeInput.value.trim() +
-      " | Code: " + topicCode;
+      "Participant: " + getSubjectCode();
 
     topicText.textContent = TOPICS[familiarity];
     taskInfo.classList.add("hidden");
@@ -508,11 +656,11 @@
     if (planningMode === "a") {
       experimentPage.className = "dual";
       aiPanel.classList.remove("hidden");
+      aiPanel.style.display = "";
 
     } else {
       experimentPage.className = "single";
       aiPanel.classList.add("hidden");
-
     }
 
     // Condition-specific planning message
@@ -524,8 +672,8 @@
     } else if (planningMode === "a") {
       planningInstruction.classList.remove("hidden");
       planningInstruction.textContent =
-        "You will have 10 minutes to plan using the AI tool. " +
-        "The writing box will remain locked until the AI planning period ends.";
+        "You will have 10 minutes to plan using the AI tool and the paper provided. " +
+        "The AI interface will close when the writing phase begins.";
     } else {
       planningInstruction.classList.add("hidden");
       planningInstruction.textContent = "";
@@ -544,6 +692,25 @@
     aiTimer.textContent = "10:00";
     updateWordCountDisplay();
   }
+
+  subjectNumberInput.addEventListener("input", () => {
+    subjectNumberInput.value = normaliseSubjectNumber(subjectNumberInput.value);
+    showAccessStatus("");
+  });
+
+  accessCodeAInput.addEventListener("input", () => {
+    accessCodeAInput.value = normaliseAccessPart(accessCodeAInput.value);
+    showAccessStatus("");
+
+    if (accessCodeAInput.value.length === 4) {
+      accessCodeBInput.focus();
+    }
+  });
+
+  accessCodeBInput.addEventListener("input", () => {
+    accessCodeBInput.value = normaliseAccessPart(accessCodeBInput.value);
+    showAccessStatus("");
+  });
 
   // ---------------- PHASE CONTROL ----------------
   function startTask() {
@@ -659,8 +826,9 @@ function beginWriting() {
     stopBtn.disabled = false;
 
     keystrokeLog.push({
-      subject_code: subjectCodeInput.value.trim(),
+      subject_code: getSubjectCode(),
       topic_code: topicCode,
+      assignment_source: "access_code",
       condition: getConditionLabel(),
       familiarity: familiarity,
       planning_mode: planningMode,
@@ -741,7 +909,7 @@ function beginWriting() {
     if (phase !== "writing") return;
 
     keystrokeLog.push({
-      subject_code: subjectCodeInput.value.trim(),
+      subject_code: getSubjectCode(),
       topic_code: topicCode,
       condition: getConditionLabel(),
       familiarity: familiarity,
@@ -1049,7 +1217,7 @@ function beginWriting() {
 
   function getBaseFilename() {
     return (
-      sanitizeFilename(subjectCodeInput.value.trim() || "participant") +
+      sanitizeFilename(getSubjectCode() || "participant") +
       "_" +
       sanitizeFilename(topicCode || "condition")
     );
@@ -1087,7 +1255,7 @@ function beginWriting() {
   function makeMinuteSnapshotTXT() {
     const lines = [];
 
-    lines.push("Subject code: " + subjectCodeInput.value.trim());
+    lines.push("Subject code: " + getSubjectCode());
     lines.push("Topic code: " + topicCode);
     lines.push("Condition: " + getConditionLabel());
     lines.push("");
@@ -1131,7 +1299,7 @@ function beginWriting() {
     if (phase !== "finished" || planningMode !== "a") return;
 
     const payload = {
-      subject_code: subjectCodeInput.value.trim(),
+      subject_code: getSubjectCode(),
       topic_code: topicCode,
       condition: getConditionLabel(),
       planning_minutes: PLANNING_MINUTES,
@@ -1148,7 +1316,7 @@ function beginWriting() {
 
   function makeMetadataObject() {
     return {
-      subject_code: subjectCodeInput.value.trim(),
+      subject_code: getSubjectCode(),
       topic_code: topicCode,
       condition: getConditionLabel(),
       planning_mode: planningMode,
@@ -1195,7 +1363,7 @@ function beginWriting() {
 
       if (planningMode === "a") {
         const chatPayload = {
-          subject_code: subjectCodeInput.value.trim(),
+          subject_code: getSubjectCode(),
           topic_code: topicCode,
           condition: getConditionLabel(),
           planning_minutes: PLANNING_MINUTES,
@@ -1235,6 +1403,12 @@ function beginWriting() {
 
   // ---------------- EVENTS ----------------
   continueBtn.addEventListener("click", routeCondition);
+  accessCodeBInput.addEventListener("keydown", function(e) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      routeCondition();
+    }
+  });
   startBtn.addEventListener("click", startTask);
   endPlanningBtn.addEventListener("click", endPlanningEarly);
   stopBtn.addEventListener("click", () => finishTask(false));
