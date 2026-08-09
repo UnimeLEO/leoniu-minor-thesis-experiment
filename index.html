@@ -147,6 +147,42 @@
     margin-right: auto;
     background: #f7f7f7;
     border: 1px solid #ddd;
+    white-space: normal;
+  }
+
+  .msg.ai p {
+    margin: 0 0 0.65em 0;
+  }
+
+  .msg.ai p:last-child {
+    margin-bottom: 0;
+  }
+
+  .msg.ai ul,
+  .msg.ai ol {
+    margin: 0.45em 0 0.7em 1.35em;
+    padding: 0;
+  }
+
+  .msg.ai h1,
+  .msg.ai h2,
+  .msg.ai h3,
+  .msg.ai h4 {
+    margin: 0.8em 0 0.35em 0;
+    line-height: 1.25;
+  }
+
+  .msg.ai h1:first-child,
+  .msg.ai h2:first-child,
+  .msg.ai h3:first-child,
+  .msg.ai h4:first-child {
+    margin-top: 0;
+  }
+
+  .msg.ai code {
+    background: #eee;
+    padding: 0.08em 0.28em;
+    border-radius: 4px;
   }
 
   .chat-input-wrap {
@@ -233,6 +269,10 @@
   }
 </style>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>
+
 </head>
 <body>
 <div class="page-wrap">
@@ -378,6 +418,7 @@
   let planningMode = "";   // a / i / n
   let familiarity = "";    // h / l
   let phase = "setup";     // setup / ready / planning / writing / finished
+  let aiAbortController = null;
 
   let phaseStartTime = null;
   let timerInterval = null;
@@ -572,6 +613,12 @@ function hideAiPanelForWriting() {
   // Switch the experiment layout from two columns to one full-width writing panel.
   experimentPage.classList.remove("dual");
 
+  // Stop any AI stream still running at the exact moment planning ends.
+  if (aiAbortController) {
+    aiAbortController.abort();
+    aiAbortController = null;
+  }
+
   // Hard-disable AI interaction once writing starts.
   promptBox.disabled = true;
   sendBtn.disabled = true;
@@ -729,16 +776,38 @@ function beginWriting() {
   function addChatMessage(text, role) {
     const div = document.createElement("div");
     div.className = "msg " + role;
-    div.textContent = text;
+
+    if (role === "ai") {
+      renderMarkdownInto(div, text);
+    } else {
+      div.textContent = text;
+    }
+
     chatMessages.appendChild(div);
     chatMessages.scrollTop = chatMessages.scrollHeight;
+    return div;
+  }
+
+  function renderMarkdownInto(element, markdownText) {
+    if (
+      window.marked &&
+      typeof window.marked.parse === "function" &&
+      window.DOMPurify
+    ) {
+      const rawHtml = window.marked.parse(markdownText || "");
+      element.innerHTML = window.DOMPurify.sanitize(rawHtml);
+    } else {
+      element.textContent = markdownText || "";
+    }
   }
 
   function buildApiMessages() {
-    return chatLog.map(item => ({
-      role: item.role === "assistant" ? "assistant" : "user",
-      content: item.text
-    }));
+    return chatLog
+      .filter(item => item.role === "user" || item.role === "assistant")
+      .map(item => ({
+        role: item.role,
+        content: item.text
+      }));
   }
 
   async function sendPrompt() {
@@ -748,15 +817,13 @@ function beginWriting() {
     const text = promptBox.value.trim();
     if (!text) return;
 
-    if (
-      !WORKER_URL ||
-      WORKER_URL === "PASTE_YOUR_CLOUDFLARE_WORKER_URL_HERE"
-    ) {
+    if (!WORKER_URL) {
       alert("The Cloudflare Worker URL has not been configured yet.");
       return;
     }
 
-    const promptTime = (nowMs() - phaseStartTime).toFixed(2);
+    const requestStartedAt = nowMs();
+    const promptTime = (requestStartedAt - phaseStartTime).toFixed(2);
 
     addChatMessage(text, "user");
     chatLog.push({
@@ -769,7 +836,27 @@ function beginWriting() {
     aiRequestInFlight = true;
     sendBtn.disabled = true;
     promptBox.disabled = true;
-    aiStatus.textContent = "Waiting for AI response...";
+    aiStatus.textContent = "AI is responding...";
+
+    aiAbortController = new AbortController();
+
+    let fullText = "";
+    let firstTokenLatencyMs = null;
+    let aiBubble = null;
+    let latestResponseMeta = null;
+    let renderScheduled = false;
+
+    const scheduleRender = () => {
+      if (!aiBubble || renderScheduled) return;
+      renderScheduled = true;
+      setTimeout(() => {
+        renderScheduled = false;
+        if (phase === "planning" && aiBubble) {
+          renderMarkdownInto(aiBubble, fullText);
+          chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+      }, 60);
+    };
 
     try {
       const response = await fetch(WORKER_URL, {
@@ -779,60 +866,163 @@ function beginWriting() {
         },
         body: JSON.stringify({
           messages: buildApiMessages()
-        })
+        }),
+        signal: aiAbortController.signal
       });
 
-      let data;
-      try {
-        data = await response.json();
-      } catch (_) {
-        throw new Error("The AI service returned an unreadable response.");
-      }
-
       if (!response.ok) {
-        const message =
-          typeof data?.error === "string"
-            ? data.error
-            : data?.error?.message
-              ? data.error.message
-              : JSON.stringify(data?.error || data || "The AI request failed.");
+        let message = "The AI request failed.";
+        try {
+          const data = await response.json();
+          message =
+            typeof data?.error === "string"
+              ? data.error
+              : data?.error?.message
+                ? data.error.message
+                : JSON.stringify(data?.error || data);
+        } catch (_) {
+          const raw = await response.text().catch(() => "");
+          if (raw) message = raw;
+        }
         throw new Error(message);
       }
 
-      if (typeof data?.text !== "string" || !data.text.trim()) {
-        throw new Error(
-          "The AI service returned an invalid text payload: " +
-          JSON.stringify(data?.text ?? data)
-        );
+      if (!response.body) {
+        throw new Error("Streaming response body is unavailable.");
       }
 
-      const responseTime = (nowMs() - phaseStartTime).toFixed(2);
-
-      // If planning ended while the request was in flight, do not display
-      // the late response during the writing stage.
+      // Create an empty assistant bubble as soon as the HTTP stream opens.
       if (phase === "planning") {
-        addChatMessage(data.text, "ai");
+        aiBubble = addChatMessage("", "ai");
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let sseBuffer = "";
+
+      const handleEvent = (event) => {
+        if (!event || typeof event !== "object") return;
+
+        if (event.type === "response.output_text.delta") {
+          if (firstTokenLatencyMs === null) {
+            firstTokenLatencyMs = nowMs() - requestStartedAt;
+          }
+
+          if (typeof event.delta === "string") {
+            fullText += event.delta;
+            scheduleRender();
+          }
+        } else if (event.type === "response.completed") {
+          latestResponseMeta = event.response || null;
+        } else if (event.type === "error") {
+          throw new Error(
+            event?.error?.message ||
+            event?.message ||
+            "OpenAI streaming error."
+          );
+        }
+      };
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        sseBuffer += decoder.decode(value, { stream: true });
+
+        // OpenAI SSE events are separated by a blank line.
+        const blocks = sseBuffer.split(/\r?\n\r?\n/);
+        sseBuffer = blocks.pop() || "";
+
+        for (const block of blocks) {
+          const dataLines = block
+            .split(/\r?\n/)
+            .filter(line => line.startsWith("data:"))
+            .map(line => line.slice(5).trim());
+
+          if (!dataLines.length) continue;
+
+          const payload = dataLines.join("\n");
+          if (!payload || payload === "[DONE]") continue;
+
+          try {
+            handleEvent(JSON.parse(payload));
+          } catch (parseOrStreamError) {
+            if (parseOrStreamError instanceof SyntaxError) {
+              // Ignore malformed/non-JSON SSE payloads rather than breaking the task.
+              continue;
+            }
+            throw parseOrStreamError;
+          }
+        }
+      }
+
+      // Final full Markdown render.
+      if (phase === "planning" && aiBubble) {
+        renderMarkdownInto(aiBubble, fullText);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+      }
+
+      const requestCompletedAt = nowMs();
+      const responseTime = (requestCompletedAt - phaseStartTime).toFixed(2);
+
+      if (!fullText.trim()) {
+        throw new Error("The AI service returned no text.");
       }
 
       chatLog.push({
         role: "assistant",
         time_ms: responseTime,
-        text: data.text,
-        arrived_after_planning: phase !== "planning"
+        text: fullText,
+        first_token_latency_ms:
+          firstTokenLatencyMs === null ? null : Number(firstTokenLatencyMs.toFixed(2)),
+        total_response_latency_ms:
+          Number((requestCompletedAt - requestStartedAt).toFixed(2)),
+        model: latestResponseMeta?.model || null,
+        usage: latestResponseMeta?.usage || null,
+        stream_completed: true
       });
 
     } catch (error) {
-      const errorText = "AI request error: " + (error?.message || String(error));
+      const interruptedByPlanningEnd =
+        error?.name === "AbortError" && phase !== "planning";
 
-      addChatMessage(errorText, "ai");
-      chatLog.push({
-        role: "system_error",
-        time_ms: (nowMs() - phaseStartTime).toFixed(2),
-        text: errorText
-      });
+      if (interruptedByPlanningEnd) {
+        // Preserve whatever the participant actually saw during planning.
+        if (fullText.trim()) {
+          chatLog.push({
+            role: "assistant",
+            time_ms: (nowMs() - phaseStartTime).toFixed(2),
+            text: fullText,
+            first_token_latency_ms:
+              firstTokenLatencyMs === null ? null : Number(firstTokenLatencyMs.toFixed(2)),
+            total_response_latency_ms:
+              Number((nowMs() - requestStartedAt).toFixed(2)),
+            stream_completed: false,
+            interrupted_at_planning_end: true
+          });
+        }
+      } else {
+        const errorText =
+          "AI request error: " + (error?.message || String(error));
+
+        if (phase === "planning") {
+          if (aiBubble && !fullText.trim()) {
+            aiBubble.textContent = errorText;
+          } else {
+            addChatMessage(errorText, "ai");
+          }
+        }
+
+        chatLog.push({
+          role: "system_error",
+          time_ms: (nowMs() - phaseStartTime).toFixed(2),
+          text: errorText
+        });
+      }
 
     } finally {
       aiRequestInFlight = false;
+      aiAbortController = null;
 
       if (phase === "planning" && planningMode === "a") {
         promptBox.disabled = false;
