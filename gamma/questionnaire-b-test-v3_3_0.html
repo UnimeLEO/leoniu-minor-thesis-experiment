@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gamma 3.3.0 Questionnaire B Simulator</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    max-width: 760px;
+    margin: 48px auto;
+    padding: 0 20px;
+    line-height: 1.55;
+    color: #111;
+  }
+
+  .card {
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    padding: 24px;
+    background: #fff;
+  }
+
+  .warning {
+    background: #fff8e6;
+    border: 1px solid #e6cf8a;
+    padding: 12px 14px;
+    border-radius: 6px;
+    margin-bottom: 18px;
+  }
+
+  .section {
+    border-top: 1px solid #ddd;
+    padding-top: 18px;
+    margin-top: 18px;
+  }
+
+  .section:first-of-type {
+    border-top: 0;
+    padding-top: 0;
+  }
+
+  .section h2 {
+    margin-bottom: 6px;
+  }
+
+  button {
+    font: inherit;
+    padding: 10px 16px;
+    margin-top: 18px;
+    cursor: pointer;
+  }
+
+  .complete {
+    display: none;
+    text-align: center;
+    padding: 28px 12px;
+  }
+
+  .meta {
+    color: #555;
+    margin-bottom: 18px;
+  }
+</style>
+</head>
+<body>
+<div class="card" id="surveyCard">
+  <h1>Questionnaire B Simulator</h1>
+
+  <p class="warning">
+    Development test page only. This temporarily stands in for the final Qualtrics questionnaire chain.
+  </p>
+
+  <p class="meta">
+    <strong>Subject:</strong> <span id="subject">—</span><br>
+    <strong>Task number:</strong> <span id="task">—</span>
+  </p>
+
+  <div class="section">
+    <h2>Part I — Immediate Post-task Questionnaire B</h2>
+    <p>This section represents the immediate post-task ratings for Task 2.</p>
+  </div>
+
+  <div class="section">
+    <h2>Part II — Writing Topic Familiarity</h2>
+    <p>This section represents the familiarity ratings for the two writing prompts.</p>
+  </div>
+
+  <div class="section">
+    <h2>Part III — Participant Background Information</h2>
+    <p>This section represents the participant background questionnaire.</p>
+  </div>
+
+  <button id="submitBtn">Submit Final Questionnaire (Simulation)</button>
+</div>
+
+<div class="card complete" id="completeCard">
+  <h1>Study Completed</h1>
+  <p>You have completed all writing tasks and questionnaires.</p>
+  <p>研究任务及问卷已全部完成。感谢你的参与。</p>
+</div>
+
+<script>
+  const params = new URLSearchParams(window.location.search);
+  const subject = params.get("subject_code") || "";
+  const taskNumber = params.get("task_number") || "";
+
+  document.getElementById("subject").textContent = subject || "Missing";
+  document.getElementById("task").textContent = taskNumber || "Missing";
+
+  document.getElementById("submitBtn").addEventListener("click", () => {
+    document.getElementById("surveyCard").style.display = "none";
+    document.getElementById("completeCard").style.display = "block";
+
+    // Keep the final completion state on this page.
+    window.history.replaceState(
+      {},
+      document.title,
+      window.location.pathname + "?completed=1"
+    );
+  });
+</script>
+</body>
+</html>
