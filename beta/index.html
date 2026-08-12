@@ -325,11 +325,11 @@
     flex-wrap: wrap;
   }
 
- #mainTimer,
- #aiTimer {
-  font-size: 22px;
-  font-weight: 700;
-  color: #c00000;
+  #mainTimer,
+  #aiTimer {
+    font-size: 22px;
+    font-weight: 700;
+    color: #c00000;
   }
 
   @media (max-width: 900px) {
@@ -761,6 +761,24 @@
     accessCodeBInput.value = normaliseAccessPart(accessCodeBInput.value);
     showAccessStatus("");
   });
+
+  function handleFullAccessCodePaste(event) {
+    const pastedText = event.clipboardData?.getData("text") || "";
+    const compactCode = pastedText
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, "");
+
+    if (compactCode.length < 8) return;
+
+    event.preventDefault();
+    accessCodeAInput.value = compactCode.slice(0, 4);
+    accessCodeBInput.value = compactCode.slice(4, 8);
+    showAccessStatus("");
+    accessCodeBInput.focus();
+  }
+
+  accessCodeAInput.addEventListener("paste", handleFullAccessCodePaste);
+  accessCodeBInput.addEventListener("paste", handleFullAccessCodePaste);
 
   // ---------------- PHASE CONTROL ----------------
   async function markAssignmentUsed() {
