@@ -1,17 +1,17 @@
 <!--
 Project: leoniu-minor-thesis-experiment
-Version: 3.0.0
+Version: 3.2.0
 Codename: Gamma
 Parent baseline: Beta v3.5 (paste-enabled AC + red timers)
-Purpose: Gamma participant frontend integration build 1.
-Implements the Gamma single-AC two-task server routing against mt-gamma-ai.
-Qualtrics handoff/session-return logic is intentionally not included yet.
+Purpose: Gamma participant frontend integration build 2.
+Adds ZIP-gated Next Step, Task 1 questionnaire handoff, and automatic Task 2 return/resume.
+This build uses a temporary questionnaire simulator URL for end-to-end testing; replace it with the final Qualtrics Survey A URL later.
 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Minor Thesis Experiment – Gamma 3.0.0</title>
+<title>Minor Thesis Experiment – Gamma 3.2.0</title>
 <style>
   * { box-sizing: border-box; }
 
@@ -356,6 +356,77 @@ Qualtrics handoff/session-return logic is intentionally not included yet.
       max-height: 650px;
     }
   }
+
+  .next-step-btn {
+    background: #e6e6e6;
+    color: #888;
+    border-color: #bbb;
+    font-weight: 700;
+  }
+
+  .next-step-btn.ready {
+    background: #c00000;
+    color: #fff;
+    border-color: #c00000;
+  }
+
+  .next-step-btn.ready:hover {
+    background: #a00000;
+  }
+
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.48);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 9999;
+  }
+
+  .modal-card {
+    width: min(620px, 100%);
+    background: #fff;
+    border-radius: 10px;
+    padding: 24px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.28);
+  }
+
+  .modal-card h3 {
+    margin-top: 0;
+    margin-bottom: 12px;
+  }
+
+  .modal-card p {
+    margin: 8px 0;
+    line-height: 1.55;
+  }
+
+  .modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 20px;
+    flex-wrap: wrap;
+  }
+
+  .confirm-btn {
+    background: #c00000;
+    color: #fff;
+    border-color: #c00000;
+    font-weight: 700;
+  }
+
+  .resume-banner {
+    margin-bottom: 16px;
+    padding: 12px 14px;
+    border: 1px solid #b8c7d9;
+    background: #f3f7fb;
+    border-radius: 6px;
+    line-height: 1.45;
+  }
+
 </style>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 
@@ -367,7 +438,7 @@ Qualtrics handoff/session-return logic is intentionally not included yet.
 <div class="page-wrap">
 
   <div class="panel" id="setupPage">
-    <h2>Participant Information <span class="gamma-badge">GAMMA 3.0.0</span></h2>
+    <h2>Participant Information <span class="gamma-badge">GAMMA 3.2.0</span></h2>
 
     <div class="setup-intro">
       You are invited to take part in a writing study.
@@ -415,6 +486,10 @@ Qualtrics handoff/session-return logic is intentionally not included yet.
   </div>
 
   <div id="experimentPage" class="hidden">
+
+    <div id="resumeBanner" class="resume-banner hidden">
+      Session restored successfully. You may begin Task 2 when you are ready.
+    </div>
 
     <!-- AI panel: only used for a* conditions -->
     <section class="panel task-panel hidden" id="aiPanel">
@@ -482,12 +557,37 @@ Qualtrics handoff/session-return logic is intentionally not included yet.
           <button id="endPlanningBtn" class="hidden" disabled>Finish Planning Early</button>
           <button id="stopBtn" disabled>Finish</button>
           <button id="downloadPackageBtn" disabled>Download Data Package (.zip)</button>
+          <button id="nextStepBtn" class="next-step-btn" disabled>Next Step</button>
         </div>
       </div>
     </section>
 
   </div>
 </div>
+
+
+  <div id="nextStepModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="nextStepModalTitle">
+    <div class="modal-card">
+      <h3 id="nextStepModalTitle">Important / 重要</h3>
+      <p>
+        You are about to leave the writing task and continue to the next step.
+        Please confirm that the ZIP data package has been downloaded and saved locally.
+      </p>
+      <p>
+        你即将离开当前写作任务并进入下一步骤。请确认 ZIP 数据包已经下载并保存在本地。
+      </p>
+      <p>
+        After continuing, you should not return to this completed writing task through the normal study workflow.
+      </p>
+      <p>
+        继续后，请不要通过正常实验流程返回已经完成的写作任务。
+      </p>
+      <div class="modal-actions">
+        <button id="cancelNextStepBtn">Cancel / 取消</button>
+        <button id="confirmNextStepBtn" class="confirm-btn">Confirm and Continue / 确认并继续</button>
+      </div>
+    </div>
+  </div>
 
 <script>
   // ---------------- CONFIG ----------------
@@ -498,6 +598,19 @@ Qualtrics handoff/session-return logic is intentionally not included yet.
   // Example: https://minor-thesis-ai-proxy.YOUR-SUBDOMAIN.workers.dev
   // Gamma Worker will handle Gamma access/session authorization and AI proxying.
   const WORKER_URL = "https://mt-gamma-ai.njsukleo.workers.dev/";
+
+  // Gamma integration test:
+  // Upload questionnaire-a-test.html into the same /gamma/ directory for the current test build.
+  // Later replace this relative URL with the final Qualtrics Survey A URL.
+  const TASK1_QUESTIONNAIRE_URL = "questionnaire-a-test-v3_2_0.html";
+
+  // Qualtrics Survey A should redirect here after submission.
+  const TASK2_RESUME_URL =
+    window.location.origin +
+    window.location.pathname +
+    "?resume=task2";
+
+  const GAMMA_SESSION_KEY = "mt_gamma_sequence_session_v3";
 
   // Replace these placeholders later with the final experimental prompts.
   const TOPICS = {
@@ -531,6 +644,12 @@ Qualtrics handoff/session-return logic is intentionally not included yet.
   const endPlanningBtn = document.getElementById("endPlanningBtn");
   const stopBtn = document.getElementById("stopBtn");
   const downloadPackageBtn = document.getElementById("downloadPackageBtn");
+  const nextStepBtn = document.getElementById("nextStepBtn");
+
+  const resumeBanner = document.getElementById("resumeBanner");
+  const nextStepModal = document.getElementById("nextStepModal");
+  const cancelNextStepBtn = document.getElementById("cancelNextStepBtn");
+  const confirmNextStepBtn = document.getElementById("confirmNextStepBtn");
 
   const chatMessages = document.getElementById("chatMessages");
   const promptBox = document.getElementById("promptBox");
@@ -545,6 +664,7 @@ Qualtrics handoff/session-return logic is intentionally not included yet.
   let serverTaskStartedAt = null;
   let finishRequestInFlight = false;
   let pendingFinishAutoStopped = false;
+  let zipDownloadInitiated = false;
   let planningMode = "";   // a / i / n
   let familiarity = "";    // h / l
   let phase = "setup";     // setup / ready / planning / writing / finishing / finish_pending / finished
@@ -647,6 +767,94 @@ Qualtrics handoff/session-return logic is intentionally not included yet.
     return true;
   }
 
+
+  function splitAccessCodeForInputs(accessCode) {
+    const compact = String(accessCode || "")
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, "");
+
+    if (compact.length !== 8) return false;
+
+    accessCodeAInput.value = compact.slice(0, 4);
+    accessCodeBInput.value = compact.slice(4, 8);
+    return true;
+  }
+
+  function saveGammaSessionForReturn() {
+    const payload = {
+      subject_code: getSubjectCode(),
+      access_code: activeAccessCode,
+      expected_task_number: 2,
+      saved_at: Date.now()
+    };
+
+    sessionStorage.setItem(
+      GAMMA_SESSION_KEY,
+      JSON.stringify(payload)
+    );
+  }
+
+  function clearGammaSession() {
+    sessionStorage.removeItem(GAMMA_SESSION_KEY);
+  }
+
+  function readGammaSession() {
+    try {
+      const raw = sessionStorage.getItem(GAMMA_SESSION_KEY);
+      if (!raw) return null;
+
+      const parsed = JSON.parse(raw);
+
+      if (
+        !/^P\d{2}$/.test(String(parsed?.subject_code || "")) ||
+        !/^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(String(parsed?.access_code || "")) ||
+        Number(parsed?.expected_task_number) !== 2
+      ) {
+        return null;
+      }
+
+      return parsed;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function setNextStepAvailability(enabled) {
+    nextStepBtn.disabled = !enabled;
+    nextStepBtn.classList.toggle("ready", enabled);
+  }
+
+  function openNextStepModal() {
+    if (!zipDownloadInitiated || phase !== "finished") return;
+    nextStepModal.classList.remove("hidden");
+  }
+
+  function closeNextStepModal() {
+    nextStepModal.classList.add("hidden");
+  }
+
+  function buildTask1QuestionnaireUrl() {
+    const target = new URL(
+      TASK1_QUESTIONNAIRE_URL,
+      window.location.href
+    );
+
+    target.searchParams.set(
+      "subject_code",
+      getSubjectCode()
+    );
+    target.searchParams.set(
+      "task_number",
+      String(activeTaskNumber)
+    );
+    target.searchParams.set(
+      "return_url",
+      TASK2_RESUME_URL
+    );
+
+    return target.toString();
+  }
+
   async function authorizeAccessCode() {
     if (!validateSetupFields()) return null;
 
@@ -738,10 +946,7 @@ Qualtrics handoff/session-return logic is intentionally not included yet.
     }
   }
 
-  async function routeCondition() {
-    const condition = await authorizeAccessCode();
-    if (!condition) return;
-
+  function showReadyTask(condition, restored = false) {
     topicCode = condition;
     planningMode = topicCode[0];
     familiarity = topicCode[1];
@@ -780,6 +985,11 @@ Qualtrics handoff/session-return logic is intentionally not included yet.
     setupPage.classList.add("hidden");
     experimentPage.classList.remove("hidden");
 
+    resumeBanner.classList.toggle(
+      "hidden",
+      !(restored && activeTaskNumber === 2)
+    );
+
     phase = "ready";
     phaseName.textContent = "Ready";
     mainTimer.textContent =
@@ -788,7 +998,112 @@ Qualtrics handoff/session-return logic is intentionally not included yet.
         : "Planning time: 10:00";
 
     aiTimer.textContent = "10:00";
+    zipDownloadInitiated = false;
+    setNextStepAvailability(false);
     updateWordCountDisplay();
+  }
+
+  async function routeCondition() {
+    const condition = await authorizeAccessCode();
+    if (!condition) return;
+
+    showReadyTask(condition, false);
+  }
+
+  async function attemptTask2Resume() {
+    const params = new URLSearchParams(window.location.search);
+
+    if (params.get("resume") !== "task2") return;
+
+    const saved = readGammaSession();
+
+    // Remove the resume marker from the visible URL after reading it.
+    window.history.replaceState(
+      {},
+      document.title,
+      window.location.pathname
+    );
+
+    if (!saved) {
+      showAccessStatus(
+        "Automatic session recovery was unavailable. Please re-enter your original Subject Code and Access Code.",
+        "error"
+      );
+      return;
+    }
+
+    const subjectDigits = saved.subject_code.slice(1);
+    subjectNumberInput.value = subjectDigits;
+    splitAccessCodeForInputs(saved.access_code);
+
+    continueBtn.disabled = true;
+    showAccessStatus("Restoring Task 2 session...", "");
+
+    try {
+      const response = await fetch(WORKER_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          action: "authorize",
+          subject_code: saved.subject_code,
+          access_code: saved.access_code
+        })
+      });
+
+      let data = null;
+      try {
+        data = await response.json();
+      } catch (_) {
+        data = null;
+      }
+
+      if (!response.ok || !data?.valid) {
+        throw new Error("Session authorization failed.");
+      }
+
+      if (data.complete === true) {
+        clearGammaSession();
+        showAccessStatus(
+          "All writing tasks for this participant have already been completed.",
+          "ok"
+        );
+        return;
+      }
+
+      const condition =
+        typeof data?.condition === "string"
+          ? data.condition.toLowerCase()
+          : "";
+
+      const taskNumber = Number(data?.task_number);
+
+      if (
+        taskNumber !== 2 ||
+        data.started === true ||
+        !["ah", "ih", "nh", "al", "il", "nl"].includes(condition)
+      ) {
+        throw new Error("Task 2 is not available for automatic recovery.");
+      }
+
+      activeAccessCode = saved.access_code;
+      activeTaskNumber = 2;
+      serverTaskStartedAt = data.started_at || null;
+
+      clearGammaSession();
+      showAccessStatus("");
+      showReadyTask(condition, true);
+
+    } catch (error) {
+      clearGammaSession();
+      showAccessStatus(
+        "Automatic session recovery failed. Please re-enter your original Subject Code and Access Code.",
+        "error"
+      );
+    } finally {
+      continueBtn.disabled = false;
+    }
   }
 
   subjectNumberInput.addEventListener("input", () => {
@@ -1078,6 +1393,9 @@ function beginWriting() {
     stopBtn.disabled = true;
     stopBtn.textContent = "Finish";
     downloadPackageBtn.disabled = false;
+
+    zipDownloadInitiated = false;
+    setNextStepAvailability(false);
   }
 
   async function retryPendingFinish() {
@@ -1685,7 +2003,14 @@ function beginWriting() {
       document.body.appendChild(a);
       a.click();
       a.remove();
-      URL.revokeObjectURL(url);
+
+      // At this point the ZIP was successfully generated and the browser download was triggered.
+      // A normal web page cannot verify the file's final presence on disk, so the next modal
+      // asks the participant to confirm that it has been saved locally.
+      zipDownloadInitiated = true;
+      setNextStepAvailability(true);
+
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (err) {
       console.error(err);
       alert("Could not create the ZIP file. Please try again.");
@@ -1693,6 +2018,37 @@ function beginWriting() {
       downloadPackageBtn.textContent = originalLabel;
       downloadPackageBtn.disabled = false;
     }
+  }
+
+
+  function continueToNextStep() {
+    if (
+      phase !== "finished" ||
+      !zipDownloadInitiated ||
+      ![1, 2].includes(activeTaskNumber)
+    ) {
+      return;
+    }
+
+    if (activeTaskNumber === 1) {
+      // Save the original server-validated credentials only in this tab's sessionStorage.
+      // They are used solely to re-authorize Task 2 when Survey A redirects back.
+      saveGammaSessionForReturn();
+
+      const questionnaireUrl = buildTask1QuestionnaireUrl();
+
+      closeNextStepModal();
+
+      // replace() reduces ordinary browser-history return to the completed writing page.
+      window.location.replace(questionnaireUrl);
+      return;
+    }
+
+    // Task 2 questionnaire integration is intentionally deferred to the next Gamma build.
+    closeNextStepModal();
+    alert(
+      "Task 2 questionnaire handoff is not configured in this integration-test build yet."
+    );
   }
 
   // ---------------- EVENTS ----------------
@@ -1714,6 +2070,15 @@ function beginWriting() {
   });
 
   downloadPackageBtn.addEventListener("click", downloadDataPackage);
+  nextStepBtn.addEventListener("click", openNextStepModal);
+  cancelNextStepBtn.addEventListener("click", closeNextStepModal);
+  confirmNextStepBtn.addEventListener("click", continueToNextStep);
+
+  nextStepModal.addEventListener("click", event => {
+    if (event.target === nextStepModal) {
+      closeNextStepModal();
+    }
+  });
 
   sendBtn.addEventListener("click", sendPrompt);
 
@@ -1739,6 +2104,11 @@ function beginWriting() {
     updateWordCountDisplay();
     addWritingLog("input", "", e.inputType, e.data);
   });
+
+  // If Survey A has redirected back to /gamma/?resume=task2,
+  // attempt a silent server re-authorization using this tab's temporary Gamma session.
+  attemptTask2Resume();
+
 </script>
 </body>
 </html>
