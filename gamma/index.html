@@ -1,13 +1,12 @@
 <!--
 Project: leoniu-minor-thesis-experiment
-Version: 3.3.0
+Version: 3.4.0
 Codename: Gamma
 Parent baseline: Beta v3.5 (paste-enabled AC + red timers)
-Purpose: Gamma participant frontend integration build 3.
-Adds the complete questionnaire handoff chain:
-Task 1 -> Questionnaire A -> automatic return to Task 2 Ready,
-and Task 2 -> Questionnaire B / Familiarity / Background -> study completion.
-Temporary questionnaire simulators are used for end-to-end testing; replace them with final Qualtrics URLs later.
+Purpose: Gamma participant frontend integration build 4.
+Real Qualtrics integration:
+Task 1 -> Survey A -> automatic return to Task 2 Ready,
+and Task 2 -> Survey B -> final study completion page.
 -->
 <!DOCTYPE html>
 <html lang="en">
@@ -448,7 +447,7 @@ Temporary questionnaire simulators are used for end-to-end testing; replace them
 <div class="page-wrap">
 
   <div class="panel" id="setupPage">
-    <h2>Participant Information <span class="gamma-badge">GAMMA 3.3.0</span></h2>
+    <h2>Participant Information <span class="gamma-badge">GAMMA 3.4.0</span></h2>
 
     <div class="setup-intro">
       You are invited to take part in a writing study.
@@ -610,11 +609,9 @@ Temporary questionnaire simulators are used for end-to-end testing; replace them
   // Gamma Worker will handle Gamma access/session authorization and AI proxying.
   const WORKER_URL = "https://mt-gamma-ai.njsukleo.workers.dev/";
 
-  // Gamma integration test:
-  // Upload questionnaire-a-test.html into the same /gamma/ directory for the current test build.
-  // Later replace this relative URL with the final Qualtrics Survey A URL.
-  const TASK1_QUESTIONNAIRE_URL = "questionnaire-a-test-v3_2_0.html";
-  const TASK2_QUESTIONNAIRE_URL = "questionnaire-b-test-v3_3_0.html";
+  // Final Qualtrics survey endpoints.
+  const TASK1_QUESTIONNAIRE_URL = "https://q.surveys.unimelb.edu.au/jfe/form/SV_2sEOjFBSgrYfAG2";
+  const TASK2_QUESTIONNAIRE_URL = "https://q.surveys.unimelb.edu.au/jfe/form/SV_brBQtH7noNvP83k";
 
   // Qualtrics Survey A should redirect here after submission.
   const TASK2_RESUME_URL =
