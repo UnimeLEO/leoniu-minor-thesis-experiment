@@ -408,7 +408,7 @@
 <div class="page-wrap">
 
   <div class="panel" id="setupPage">
-    <h2>Argumentative Writing System <span class="beta-badge">BETA 3.6.0</span></h2>
+    <h2>Argumentative Writing System <span class="beta-badge">BETA 3.6.1</span></h2>
 
     <div class="setup-intro">
       <div class="study-title">
@@ -497,7 +497,7 @@
       </div>
 
       <div class="chat-input-wrap">
-        <textarea id="promptBox" disabled placeholder="AI planning will begin after you press Start Task."></textarea>
+        <textarea id="promptBox" data-gramm="false" disabled placeholder="AI planning will begin after you press Start Task."></textarea>
         <div class="chat-controls">
           <span class="subtle" id="aiStatus">Not started</span>
           <button id="sendBtn" disabled>Send</button>
@@ -528,6 +528,7 @@
 
         <textarea
           id="writingBox"
+          data-gramm="false"
           disabled
           spellcheck="false"
           autocomplete="off"
