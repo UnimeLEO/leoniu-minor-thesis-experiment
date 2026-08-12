@@ -1,6 +1,6 @@
 <!--
 Project: leoniu-minor-thesis-experiment
-Version: 3.5.1
+Version: 3.5.2
 Codename: Gamma
 Parent baseline: Beta v3.5 (paste-enabled AC + red timers)
 Purpose: Gamma participant frontend integration build 5.
@@ -497,7 +497,7 @@ Real Qualtrics integration and the single-AC two-task workflow are preserved.
 <div class="page-wrap">
 
   <div class="panel" id="setupPage">
-    <h2>Argumentative Writing System <span class="gamma-badge">GAMMA 3.5.1</span></h2>
+    <h2>Argumentative Writing System <span class="gamma-badge">GAMMA 3.5.2</span></h2>
 
     <div class="setup-intro">
       <div class="study-title">
@@ -747,6 +747,7 @@ Real Qualtrics integration and the single-AC two-task workflow are preserved.
   let serverTaskStartedAt = null;
   let finishRequestInFlight = false;
   let pendingFinishAutoStopped = false;
+  let leaveWarningActive = false;
   let zipDownloadInitiated = false;
   let planningMode = "";   // a / i / n
   let familiarity = "";    // h / l
@@ -1276,6 +1277,15 @@ Real Qualtrics integration and the single-AC two-task workflow are preserved.
   accessCodeAInput.addEventListener("paste", handleFullAccessCodePaste);
   accessCodeBInput.addEventListener("paste", handleFullAccessCodePaste);
 
+  // Warn against accidental refresh/close/navigation while a task is active.
+  // Modern browsers display their own standard warning text.
+  window.addEventListener("beforeunload", (event) => {
+    if (!leaveWarningActive) return;
+
+    event.preventDefault();
+    event.returnValue = "";
+  });
+
   // ---------------- PHASE CONTROL ----------------
   async function startServerTask() {
     if (![1, 2].includes(activeTaskNumber)) {
@@ -1330,6 +1340,7 @@ Real Qualtrics integration and the single-AC two-task workflow are preserved.
       // Gamma records the specific Task 1 / Task 2 start server-side.
       // Passing the access screen alone never starts the task.
       await startServerTask();
+      leaveWarningActive = true;
 
     } catch (error) {
       alert(
@@ -1518,6 +1529,7 @@ function beginWriting() {
   }
 
   function finaliseFinishedUi(autoStopped) {
+    leaveWarningActive = false;
     phase = "finished";
     phaseName.textContent = "Finished";
     mainTimer.textContent =
