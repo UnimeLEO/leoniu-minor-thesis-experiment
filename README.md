@@ -1,0 +1,27 @@
+## leoniu-minor-thesis-experiment
+Version: 3.0.0
+Codename: Gamma
+Status: Gamma mother template / development baseline
+
+Parent baseline:
+- Beta v3.5 participant frontend
+- Includes whole-code paste for the two-part 8-character Access Code field
+- Includes enlarged red main/AI countdown timers
+- Preserves existing Beta experimental task logic, logging, ZIP export, AI streaming and Markdown rendering
+
+Mother-template changes only:
+1. Version metadata set to 3.0.0 / Gamma.
+2. Visible participant-page badge changed from BETA to GAMMA 3.0.0.
+3. Planned participant Worker endpoint changed to:
+   https://mt-ai-proxy-gamma.njsukleo.workers.dev/
+4. No Gamma sequence/session logic has yet been added to this mother template.
+
+Important:
+- Do not overwrite Beta.
+- Do not deploy this Gamma page as a functional experiment until the Gamma participant Worker exists.
+- Gamma development will implement one SC + one AC for a complete Task 1 + Task 2 sequence, continuous Qualtrics workflow, task-state recovery, and Gamma Admin changes.
+- Small generic UI/UX improvements developed later should be considered for backporting to Beta when low-risk and useful.
+
+Versioning convention for this project:
+- Large functional update: 3.0.x -> 3.1.x
+- Small patch/update: 3.0.0 -> 3.0.1
