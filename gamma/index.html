@@ -1,6 +1,6 @@
 <!--
 Project: leoniu-minor-thesis-experiment
-Version: 3.5.2
+Version: 3.5.3
 Codename: Gamma
 Parent baseline: Beta v3.5 (paste-enabled AC + red timers)
 Purpose: Gamma participant frontend integration build 5.
@@ -497,7 +497,7 @@ Real Qualtrics integration and the single-AC two-task workflow are preserved.
 <div class="page-wrap">
 
   <div class="panel" id="setupPage">
-    <h2>Argumentative Writing System <span class="gamma-badge">GAMMA 3.5.2</span></h2>
+    <h2>Argumentative Writing System <span class="gamma-badge">GAMMA 3.5.3</span></h2>
 
     <div class="setup-intro">
       <div class="study-title">
@@ -590,7 +590,7 @@ Real Qualtrics integration and the single-AC two-task workflow are preserved.
       </div>
 
       <div class="chat-input-wrap">
-        <textarea id="promptBox" disabled placeholder="AI planning will begin after you press Start Task."></textarea>
+        <textarea id="promptBox" data-gramm="false" disabled placeholder="AI planning will begin after you press Start Task."></textarea>
         <div class="chat-controls">
           <span class="subtle" id="aiStatus">Not started</span>
           <button id="sendBtn" disabled>Send</button>
@@ -621,6 +621,7 @@ Real Qualtrics integration and the single-AC two-task workflow are preserved.
 
         <textarea
           id="writingBox"
+          data-gramm="false"
           disabled
           spellcheck="false"
           autocomplete="off"
