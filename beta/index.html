@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Minor Thesis Experiment – Beta Access Router</title>
+<title>Minor Thesis Experiment – Beta 3.6.0</title>
 <style>
   * { box-sizing: border-box; }
 
@@ -38,6 +38,56 @@
     border: 1px solid #ddd;
     border-radius: 6px;
     line-height: 1.5;
+  }
+
+  .study-title {
+    margin: 0 0 12px 0;
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1.4;
+  }
+
+  .study-meta {
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid #ddd;
+    font-size: 14px;
+    line-height: 1.55;
+  }
+
+  .study-meta a {
+    color: inherit;
+  }
+
+  .participant-prompt {
+    margin: 18px 0 8px 0;
+    font-weight: 700;
+  }
+
+  .consent-check {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin: 16px 0 18px 0;
+    padding: 14px 16px;
+    background: #fffdf7;
+    border: 1px solid #d8cda9;
+    border-radius: 6px;
+    line-height: 1.5;
+  }
+
+  .consent-check input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    margin: 2px 0 0 0;
+    flex: 0 0 auto;
+  }
+
+  .consent-check label {
+    display: block;
+    margin: 0;
+    font-weight: normal;
+    cursor: pointer;
   }
 
   .field-hint {
@@ -358,11 +408,31 @@
 <div class="page-wrap">
 
   <div class="panel" id="setupPage">
-    <h2>Participant Information <span class="beta-badge">BETA</span></h2>
+    <h2>Argumentative Writing System <span class="beta-badge">BETA 3.6.0</span></h2>
 
     <div class="setup-intro">
-      You are invited to take part in a writing study.
-      Please enter the participant information provided by the researcher before continuing.
+      <div class="study-title">
+        Learning English as a second language in Chinese international students: The role of pre-task planning on second language writing performance
+      </div>
+
+      <div>
+        This study investigates the role of pre-task planning in English second-language argumentative writing among Chinese international students. Participants complete timed argumentative writing tasks under assigned planning conditions, followed by post-task questionnaires.
+      </div>
+
+      <div class="study-meta">
+        <div><strong>Project ID Number:</strong> 29617</div>
+        <div><strong>Supervisor:</strong> Dr Yizhou Wang &nbsp; Email: <a href="mailto:yizwang3@unimelb.edu.au">yizwang3@unimelb.edu.au</a></div>
+        <div><strong>Researcher:</strong> Jiashuo Leo Niu &nbsp; Email: <a href="mailto:jiashuon@student.unimelb.edu.au">jiashuon@student.unimelb.edu.au</a></div>
+      </div>
+    </div>
+
+    <div class="participant-prompt">Please enter the participant information provided by the researcher.</div>
+
+    <div class="consent-check">
+      <input type="checkbox" id="consentAcknowledgement">
+      <label for="consentAcknowledgement">
+        I confirm that I have read and understood <a href="https://drive.google.com/drive/folders/121XHz-C_vOAOjpqw3AQKe0vPVXs-qLvu?usp=sharing" target="_blank" rel="noopener noreferrer">the Consent Form, Plain Language Statement (PLS), and Participant Instructions</a>. I voluntarily agree to participate in this study and to follow the Participant Instructions. I understand that I retain all participant rights described in the Consent Form and PLS, including the right to withdraw from the study at any time.
+      </label>
     </div>
 
     <label for="subjectNumber">Subject code</label>
@@ -375,7 +445,8 @@
         placeholder="e.g., 01"
         inputmode="numeric"
         autocomplete="off"
-        spellcheck="false">
+        spellcheck="false"
+        disabled>
     </div>
     <div class="field-hint">Enter the two-digit subject number.</div>
 
@@ -387,7 +458,8 @@
         maxlength="4"
         placeholder=""
         autocomplete="off"
-        spellcheck="false">
+        spellcheck="false"
+        disabled>
       <span class="access-separator">–</span>
       <input
         type="text"
@@ -395,13 +467,14 @@
         maxlength="4"
         placeholder=""
         autocomplete="off"
-        spellcheck="false">
+        spellcheck="false"
+        disabled>
     </div>
     <div class="field-hint">Enter the 8-character access code provided by the researcher.</div>
     <div id="accessStatus"></div>
 
     <div class="controls">
-      <button id="continueBtn">Continue</button>
+      <button id="continueBtn" disabled>Continue</button>
     </div>
   </div>
 
@@ -508,6 +581,7 @@
   const accessCodeBInput = document.getElementById("accessCodeB");
   const accessStatus = document.getElementById("accessStatus");
   const continueBtn = document.getElementById("continueBtn");
+  const consentAcknowledgement = document.getElementById("consentAcknowledgement");
 
   const participantLine = document.getElementById("participantLine");
   const taskInfo = document.getElementById("taskInfo");
@@ -552,6 +626,7 @@
   let lastSnapshotMinute = 0;
   let chatLog = [];
   let aiRequestInFlight = false;
+  let leaveWarningActive = false;
 
   // ---------------- HELPERS ----------------
   function nowMs() {
@@ -635,7 +710,31 @@
     return true;
   }
 
+  function updateParticipantEntryGate() {
+    const allowed = consentAcknowledgement.checked;
+
+    subjectNumberInput.disabled = !allowed;
+    accessCodeAInput.disabled = !allowed;
+    accessCodeBInput.disabled = !allowed;
+    continueBtn.disabled = !allowed;
+
+    if (!allowed) {
+      showAccessStatus("");
+    }
+  }
+
+  function participantEntryAcknowledged() {
+    if (consentAcknowledgement.checked) return true;
+
+    showAccessStatus(
+      "Please confirm the consent and participant-instructions acknowledgement before continuing.",
+      "error"
+    );
+    return false;
+  }
+
   async function authorizeAccessCode() {
+    if (!participantEntryAcknowledged()) return null;
     if (!validateSetupFields()) return null;
 
     const accessCode = getAccessCode();
@@ -688,7 +787,7 @@
       return null;
 
     } finally {
-      continueBtn.disabled = false;
+      updateParticipantEntryGate();
     }
   }
 
@@ -744,6 +843,14 @@
     updateWordCountDisplay();
   }
 
+  consentAcknowledgement.addEventListener("change", () => {
+    updateParticipantEntryGate();
+
+    if (consentAcknowledgement.checked) {
+      subjectNumberInput.focus();
+    }
+  });
+
   subjectNumberInput.addEventListener("input", () => {
     subjectNumberInput.value = normaliseSubjectNumber(subjectNumberInput.value);
     showAccessStatus("");
@@ -780,6 +887,15 @@
 
   accessCodeAInput.addEventListener("paste", handleFullAccessCodePaste);
   accessCodeBInput.addEventListener("paste", handleFullAccessCodePaste);
+
+  // Warn against accidental refresh/close/navigation while a task is active.
+  // Modern browsers display their own standard warning text.
+  window.addEventListener("beforeunload", (event) => {
+    if (!leaveWarningActive) return;
+
+    event.preventDefault();
+    event.returnValue = "";
+  });
 
   // ---------------- PHASE CONTROL ----------------
   async function markAssignmentUsed() {
@@ -826,6 +942,8 @@
       if (activeTaskNumber === null && usageResult?.task_number) {
         activeTaskNumber = Number(usageResult.task_number);
       }
+
+      leaveWarningActive = true;
 
     } catch (error) {
       alert(
@@ -972,6 +1090,8 @@ function beginWriting() {
 
   function finishTask(autoStopped = false) {
     if (phase !== "writing") return;
+
+    leaveWarningActive = false;
 
     recordMinuteSnapshotsUpToCurrentTime();
     addWritingLog(
@@ -1534,6 +1654,8 @@ function beginWriting() {
   }
 
   // ---------------- EVENTS ----------------
+  updateParticipantEntryGate();
+
   continueBtn.addEventListener("click", routeCondition);
   accessCodeBInput.addEventListener("keydown", function(e) {
     if (e.key === "Enter" && !continueBtn.disabled) {
