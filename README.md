@@ -376,3 +376,178 @@ The existing Beta database and Beta backend remain unchanged.
 Beta therefore became the project's first mature **participant assignment and access-management architecture**, while preserving the experimentally validated Stable task engine.
 
 It remains an important fallback implementation and development reference for later versions.
+
+### Gamma 3.0.0 — Participant Worker Backend
+
+The Gamma participant Worker has now been implemented and connected conceptually to the new participant-sequence database model.
+
+The Worker is designed for the Gamma architecture:
+
+`one participant + one Access Code = one two-task sequence`
+
+and uses the dedicated Gamma D1 database:
+
+`minor-thesis-participants-gamma`
+
+through the `participant_sequences` table. :contentReference[oaicite:0]{index=0}
+
+#### Participant authentication
+
+A new `authorize` action validates:
+
+- Subject Code
+- Access Code
+- participant sequence status
+- current task progress
+
+The Worker determines the participant's next available task entirely from server-side progress stored in D1.
+
+The frontend therefore no longer needs to determine whether the participant should complete Task 1 or Task 2.
+
+The authorization response can return:
+
+- current task number
+- current condition
+- whether the task has already been started
+- task start timestamp
+- overall sequence progress
+- whether both writing tasks have already been completed
+
+#### Server-side task routing
+
+The next task is determined from the task-completion timestamps.
+
+The current routing logic is:
+
+- if `task_1_finished_at` is empty → Task 1
+- if Task 1 is finished but `task_2_finished_at` is empty → Task 2
+- if both tasks are finished → sequence complete
+
+This means the current experimental stage can be recovered directly from D1 rather than being inferred only from browser-side state.
+
+Questionnaire completion is intentionally not stored in D1 at this stage.
+
+#### Task-start tracking
+
+A new `start_task` action records the beginning of each task separately.
+
+For Task 1:
+
+`task_1_started_at`
+
+is written.
+
+For Task 2:
+
+`task_2_started_at`
+
+is written.
+
+Starting a task also changes the participant-level sequence status to:
+
+`used`
+
+Task 2 cannot be started before Task 1 has been completed.
+
+Task-start operations are idempotent: repeated requests do not overwrite the original task-start timestamp.
+
+A task that has already been finished cannot be restarted.
+
+#### Task-finish tracking
+
+A new `finish_task` action records completion using:
+
+- `task_1_finished_at`
+- `task_2_finished_at`
+
+The Worker prevents a task from being marked as finished if it has never been started.
+
+Repeated finish requests are also handled idempotently and preserve the original completion timestamp.
+
+After a successful finish operation, the Worker re-reads the sequence and returns updated progress information.
+
+#### Sequence progress payload
+
+The Worker now exposes a compact progress representation containing:
+
+- whether the full sequence is complete
+- the next task number
+- whether Task 1 has started
+- whether Task 1 has finished
+- whether Task 2 has started
+- whether Task 2 has finished
+
+This provides the backend foundation for later frontend session recovery and automatic Task 1 / Task 2 routing.
+
+#### Participant access controls
+
+Sequences marked as:
+
+- `disabled`
+- `withdrawn`
+
+are rejected by the participant Worker.
+
+Invalid Subject Code + Access Code combinations are also rejected server-side.
+
+Subject Codes are normalised into the `Pxx` format, and Access Codes are normalised into the existing:
+
+`XXXX-XXXX`
+
+format before database lookup.
+
+#### AI access control
+
+The existing AI-assisted planning proxy has been migrated into the Gamma Worker and is now linked to participant-sequence state.
+
+AI requests require valid participant credentials.
+
+The Worker additionally checks that:
+
+1. the current writing task exists;
+2. the task has actually been started;
+3. the current task condition is an AI-assisted planning condition.
+
+This prevents AI access before task initiation and blocks AI use for IP and NP conditions.
+
+The existing tested AI configuration has otherwise been preserved:
+
+- OpenAI Responses API
+- streaming output
+- `store: false`
+- reasoning effort set to `none`
+- planning-only system instructions
+- API key stored as a Worker Secret
+
+#### Backend state enforcement
+
+The Worker now enforces several sequence rules server-side rather than relying only on frontend behaviour:
+
+- Task 2 cannot start before Task 1 is finished.
+- A finished task cannot be restarted.
+- A task cannot be finished before it is started.
+- Original start and finish timestamps are preserved across repeated requests.
+- AI access is unavailable before the current task starts.
+- AI access is restricted to AI-planning conditions.
+- Disabled and withdrawn participant sequences cannot proceed.
+
+These checks establish the first functional Gamma server-side state machine.
+
+#### Current backend milestone
+
+With this update, Gamma now has both:
+
+- a dedicated participant-sequence D1 schema; and
+- a participant Worker capable of authenticating participants, routing tasks, recording task progress, and enforcing AI access.
+
+The major remaining work is now primarily on the participant frontend and researcher Admin side, including:
+
+- replacing the inherited Beta `mark_used` logic with Gamma `start_task`;
+- adding `finish_task` calls to the frontend;
+- automatic sequence restoration after page return or reload;
+- Task 1 → questionnaire → Task 2 transitions;
+- local session persistence;
+- Gamma Admin sequence generation and management;
+- full end-to-end regression testing.
+
+Beta remains unchanged and continues to serve as the stable fallback implementation.
