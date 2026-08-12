@@ -3,8 +3,9 @@ Project: leoniu-minor-thesis-experiment
 Version: 3.0.0
 Codename: Gamma
 Parent baseline: Beta v3.5 (paste-enabled AC + red timers)
-Purpose: Gamma development mother template. Core experiment behaviour is intentionally unchanged at this stage.
-IMPORTANT: This mother template points to the planned Gamma participant Worker endpoint and should be deployed only after mt-ai-proxy-gamma is created.
+Purpose: Gamma participant frontend integration build 1.
+Implements the Gamma single-AC two-task server routing against mt-gamma-ai.
+Qualtrics handoff/session-return logic is intentionally not included yet.
 -->
 <!DOCTYPE html>
 <html lang="en">
@@ -496,7 +497,7 @@ IMPORTANT: This mother template points to the planned Gamma participant Worker e
   // IMPORTANT: Replace this with your deployed Cloudflare Worker URL.
   // Example: https://minor-thesis-ai-proxy.YOUR-SUBDOMAIN.workers.dev
   // Gamma Worker will handle Gamma access/session authorization and AI proxying.
-  const WORKER_URL = "https://mt-ai-proxy-gamma.njsukleo.workers.dev/";
+  const WORKER_URL = "https://mt-gamma-ai.njsukleo.workers.dev/";
 
   // Replace these placeholders later with the final experimental prompts.
   const TOPICS = {
@@ -538,11 +539,15 @@ IMPORTANT: This mother template points to the planned Gamma participant Worker e
   const aiStatus = document.getElementById("aiStatus");
 
   // ---------------- STATE ----------------
-  let topicCode = "";       // internal condition code resolved from access code
-  let activeAccessCode = "";   // kept in memory only for this session
+  let topicCode = "";       // internal condition code resolved from server-side sequence
+  let activeAccessCode = "";   // kept in memory only for this page session
+  let activeTaskNumber = null; // 1 or 2, resolved by Gamma Worker
+  let serverTaskStartedAt = null;
+  let finishRequestInFlight = false;
+  let pendingFinishAutoStopped = false;
   let planningMode = "";   // a / i / n
   let familiarity = "";    // h / l
-  let phase = "setup";     // setup / ready / planning / writing / finished
+  let phase = "setup";     // setup / ready / planning / writing / finishing / finish_pending / finished
   let aiAbortController = null;
 
   let phaseStartTime = null;
@@ -670,21 +675,55 @@ IMPORTANT: This mother template points to the planned Gamma participant Worker e
         data = null;
       }
 
-      if (!response.ok || !data?.valid || typeof data?.condition !== "string") {
+      if (!response.ok || !data?.valid) {
         showAccessStatus("Access code not recognised.", "error");
         return null;
       }
 
-      const condition = data.condition.toLowerCase();
+      if (data.complete === true) {
+        showAccessStatus(
+          "All writing tasks for this participant have already been completed.",
+          "ok"
+        );
+        return null;
+      }
 
-      if (!["ah", "ih", "nh", "al", "il", "nl"].includes(condition)) {
-        showAccessStatus("Access code configuration error.", "error");
+      const condition =
+        typeof data?.condition === "string"
+          ? data.condition.toLowerCase()
+          : "";
+
+      const taskNumber = Number(data?.task_number);
+
+      if (
+        !["ah", "ih", "nh", "al", "il", "nl"].includes(condition) ||
+        ![1, 2].includes(taskNumber)
+      ) {
+        showAccessStatus("Participant sequence configuration error.", "error");
+        return null;
+      }
+
+      // A task that is already in progress must not silently restart with a fresh timer.
+      // Normal Gamma Task 1 -> Questionnaire -> Task 2 return occurs before Task 2 starts,
+      // so this does not interfere with the intended between-task workflow.
+      if (data.started === true) {
+        showAccessStatus(
+          "Task " + taskNumber +
+          " has already been started. Please contact the researcher before continuing.",
+          "error"
+        );
         return null;
       }
 
       activeAccessCode = accessCode;
-      activeTaskNumber = Number(data.task_number) || null;
-      showAccessStatus("Access code accepted.", "ok");
+      activeTaskNumber = taskNumber;
+      serverTaskStartedAt = data.started_at || null;
+
+      showAccessStatus(
+        "Access code accepted. Task " + activeTaskNumber + " is ready.",
+        "ok"
+      );
+
       return condition;
 
     } catch (error) {
@@ -708,7 +747,8 @@ IMPORTANT: This mother template points to the planned Gamma participant Worker e
     familiarity = topicCode[1];
 
     participantLine.textContent =
-      "Participant: " + getSubjectCode();
+      "Participant: " + getSubjectCode() +
+      " | Task " + activeTaskNumber + " of 2";
 
     topicText.textContent = TOPICS[familiarity];
     taskInfo.classList.add("hidden");
@@ -789,16 +829,21 @@ IMPORTANT: This mother template points to the planned Gamma participant Worker e
   accessCodeBInput.addEventListener("paste", handleFullAccessCodePaste);
 
   // ---------------- PHASE CONTROL ----------------
-  async function markAssignmentUsed() {
+  async function startServerTask() {
+    if (![1, 2].includes(activeTaskNumber)) {
+      throw new Error("No active Gamma task is available.");
+    }
+
     const response = await fetch(WORKER_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        action: "mark_used",
+        action: "start_task",
         subject_code: getSubjectCode(),
-        access_code: activeAccessCode
+        access_code: activeAccessCode,
+        task_number: activeTaskNumber
       })
     });
 
@@ -816,6 +861,14 @@ IMPORTANT: This mother template points to the planned Gamma participant Worker e
       );
     }
 
+    if (
+      Number(data.task_number) !== activeTaskNumber ||
+      String(data.condition || "").toLowerCase() !== topicCode
+    ) {
+      throw new Error("Server task assignment mismatch.");
+    }
+
+    serverTaskStartedAt = data.started_at || null;
     return data;
   }
 
@@ -826,13 +879,9 @@ IMPORTANT: This mother template points to the planned Gamma participant Worker e
     startBtn.textContent = "Starting...";
 
     try {
-      // "Used" means the participant has actually started the task,
-      // not merely passed the access-code screen.
-      const usageResult = await markAssignmentUsed();
-
-      if (activeTaskNumber === null && usageResult?.task_number) {
-        activeTaskNumber = Number(usageResult.task_number);
-      }
+      // Gamma records the specific Task 1 / Task 2 start server-side.
+      // Passing the access screen alone never starts the task.
+      await startServerTask();
 
     } catch (error) {
       alert(
@@ -959,7 +1008,7 @@ function beginWriting() {
       subject_code: getSubjectCode(),
       topic_code: topicCode,
       task_number: activeTaskNumber,
-      assignment_source: "access_code",
+      assignment_source: "sequence_access_code",
       condition: getConditionLabel(),
       familiarity: familiarity,
       planning_mode: planningMode,
@@ -977,8 +1026,89 @@ function beginWriting() {
     timerInterval = setInterval(updatePhaseTimer, 200);
   }
 
-  function finishTask(autoStopped = false) {
-    if (phase !== "writing") return;
+  async function recordTaskFinishOnServer() {
+    if (![1, 2].includes(activeTaskNumber)) {
+      throw new Error("No active Gamma task is available.");
+    }
+
+    const response = await fetch(WORKER_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        action: "finish_task",
+        subject_code: getSubjectCode(),
+        access_code: activeAccessCode,
+        task_number: activeTaskNumber
+      })
+    });
+
+    let data = null;
+    try {
+      data = await response.json();
+    } catch (_) {
+      data = null;
+    }
+
+    if (!response.ok || !data?.success) {
+      throw new Error(
+        data?.error ||
+        "Could not confirm the task finish."
+      );
+    }
+
+    if (Number(data.task_number) !== activeTaskNumber) {
+      throw new Error("Server task-finish mismatch.");
+    }
+
+    return data;
+  }
+
+  function finaliseFinishedUi(autoStopped) {
+    phase = "finished";
+    phaseName.textContent = "Finished";
+    mainTimer.textContent =
+      autoStopped ? "Writing time: 00:00" : "Task finished";
+
+    writingBox.disabled = true;
+    promptBox.disabled = true;
+    sendBtn.disabled = true;
+
+    stopBtn.disabled = true;
+    stopBtn.textContent = "Finish";
+    downloadPackageBtn.disabled = false;
+  }
+
+  async function retryPendingFinish() {
+    if (phase !== "finish_pending" || finishRequestInFlight) return;
+
+    finishRequestInFlight = true;
+    stopBtn.disabled = true;
+    stopBtn.textContent = "Retrying...";
+    phaseName.textContent = "Confirming finish";
+
+    try {
+      await recordTaskFinishOnServer();
+      finaliseFinishedUi(pendingFinishAutoStopped);
+    } catch (error) {
+      phase = "finish_pending";
+      phaseName.textContent = "Finish pending";
+      mainTimer.textContent = "Task finish not yet confirmed";
+      stopBtn.disabled = false;
+      stopBtn.textContent = "Retry Finish";
+
+      alert(
+        "The writing task has ended locally, but the server could not confirm the finish. " +
+        "Please check the internet connection and click Retry Finish."
+      );
+    } finally {
+      finishRequestInFlight = false;
+    }
+  }
+
+  async function finishTask(autoStopped = false) {
+    if (phase !== "writing" || finishRequestInFlight) return;
 
     recordMinuteSnapshotsUpToCurrentTime();
     addWritingLog(
@@ -988,20 +1118,43 @@ function beginWriting() {
 
     writingDurationMs = writingElapsedMs();
     writingEndReason = autoStopped ? "time_limit" : "ended_by_participant";
+    pendingFinishAutoStopped = autoStopped;
 
-    phase = "finished";
+    // Freeze the participant-facing task immediately at the real finish moment.
+    phase = "finishing";
     clearInterval(timerInterval);
 
     writingBox.disabled = true;
     promptBox.disabled = true;
     sendBtn.disabled = true;
     stopBtn.disabled = true;
+    downloadPackageBtn.disabled = true;
 
-    phaseName.textContent = "Finished";
+    phaseName.textContent = "Confirming finish";
     mainTimer.textContent =
-      autoStopped ? "Writing time: 00:00" : "Task finished";
+      autoStopped ? "Writing time: 00:00" : "Confirming task finish...";
 
-    downloadPackageBtn.disabled = false;
+    finishRequestInFlight = true;
+
+    try {
+      await recordTaskFinishOnServer();
+      finaliseFinishedUi(autoStopped);
+    } catch (error) {
+      // The writing remains frozen so a network problem cannot give extra writing time.
+      // The server endpoint is idempotent, so retrying is safe if the first response was lost.
+      phase = "finish_pending";
+      phaseName.textContent = "Finish pending";
+      mainTimer.textContent = "Task finish not yet confirmed";
+      stopBtn.disabled = false;
+      stopBtn.textContent = "Retry Finish";
+
+      alert(
+        "The writing task has ended locally, but the server could not confirm the finish. " +
+        "Please check the internet connection and click Retry Finish."
+      );
+    } finally {
+      finishRequestInFlight = false;
+    }
   }
 
   function updatePhaseTimer() {
@@ -1352,6 +1505,8 @@ function beginWriting() {
   function getBaseFilename() {
     return (
       sanitizeFilename(getSubjectCode() || "participant") +
+      "_task" +
+      sanitizeFilename(activeTaskNumber ?? "x") +
       "_" +
       sanitizeFilename(topicCode || "condition")
     );
@@ -1550,7 +1705,13 @@ function beginWriting() {
   });
   startBtn.addEventListener("click", startTask);
   endPlanningBtn.addEventListener("click", endPlanningEarly);
-  stopBtn.addEventListener("click", () => finishTask(false));
+  stopBtn.addEventListener("click", () => {
+    if (phase === "finish_pending") {
+      retryPendingFinish();
+    } else {
+      finishTask(false);
+    }
+  });
 
   downloadPackageBtn.addEventListener("click", downloadDataPackage);
 
