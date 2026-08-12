@@ -1,11 +1,13 @@
 <!--
 Project: leoniu-minor-thesis-experiment
-Version: 3.2.1
+Version: 3.3.0
 Codename: Gamma
 Parent baseline: Beta v3.5 (paste-enabled AC + red timers)
-Purpose: Gamma participant frontend integration build 2.
-Adds ZIP-gated Next Step, Task 1 questionnaire handoff, and automatic Task 2 return/resume.
-This build uses a temporary questionnaire simulator URL for end-to-end testing; replace it with the final Qualtrics Survey A URL later.
+Purpose: Gamma participant frontend integration build 3.
+Adds the complete questionnaire handoff chain:
+Task 1 -> Questionnaire A -> automatic return to Task 2 Ready,
+and Task 2 -> Questionnaire B / Familiarity / Background -> study completion.
+Temporary questionnaire simulators are used for end-to-end testing; replace them with final Qualtrics URLs later.
 -->
 <!DOCTYPE html>
 <html lang="en">
@@ -446,7 +448,7 @@ This build uses a temporary questionnaire simulator URL for end-to-end testing; 
 <div class="page-wrap">
 
   <div class="panel" id="setupPage">
-    <h2>Participant Information <span class="gamma-badge">GAMMA 3.2.1</span></h2>
+    <h2>Participant Information <span class="gamma-badge">GAMMA 3.3.0</span></h2>
 
     <div class="setup-intro">
       You are invited to take part in a writing study.
@@ -612,6 +614,7 @@ This build uses a temporary questionnaire simulator URL for end-to-end testing; 
   // Upload questionnaire-a-test.html into the same /gamma/ directory for the current test build.
   // Later replace this relative URL with the final Qualtrics Survey A URL.
   const TASK1_QUESTIONNAIRE_URL = "questionnaire-a-test-v3_2_0.html";
+  const TASK2_QUESTIONNAIRE_URL = "questionnaire-b-test-v3_3_0.html";
 
   // Qualtrics Survey A should redirect here after submission.
   const TASK2_RESUME_URL =
@@ -859,6 +862,24 @@ This build uses a temporary questionnaire simulator URL for end-to-end testing; 
     target.searchParams.set(
       "return_url",
       TASK2_RESUME_URL
+    );
+
+    return target.toString();
+  }
+
+  function buildTask2QuestionnaireUrl() {
+    const target = new URL(
+      TASK2_QUESTIONNAIRE_URL,
+      window.location.href
+    );
+
+    target.searchParams.set(
+      "subject_code",
+      getSubjectCode()
+    );
+    target.searchParams.set(
+      "task_number",
+      String(activeTaskNumber)
     );
 
     return target.toString();
@@ -2057,11 +2078,16 @@ function beginWriting() {
       return;
     }
 
-    // Task 2 questionnaire integration is intentionally deferred to the next Gamma build.
-    closeNextStepModal();
-    alert(
-      "Task 2 questionnaire handoff is not configured in this integration-test build yet."
-    );
+    if (activeTaskNumber === 2) {
+      const questionnaireUrl = buildTask2QuestionnaireUrl();
+
+      // No Gamma return is expected after the final questionnaire chain.
+      clearGammaSession();
+      closeNextStepModal();
+
+      // replace() reduces ordinary browser-history return to the completed writing task.
+      window.location.replace(questionnaireUrl);
+    }
   }
 
   // ---------------- EVENTS ----------------
