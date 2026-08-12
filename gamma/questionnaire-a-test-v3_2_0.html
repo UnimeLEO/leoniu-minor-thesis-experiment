@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gamma 3.2.0 Questionnaire A Simulator</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    max-width: 720px;
+    margin: 48px auto;
+    padding: 0 20px;
+    line-height: 1.55;
+  }
+  .card {
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    padding: 24px;
+  }
+  .warning {
+    background: #fff8e6;
+    border: 1px solid #e6cf8a;
+    padding: 12px 14px;
+    border-radius: 6px;
+  }
+  button {
+    font: inherit;
+    padding: 10px 16px;
+    margin-top: 16px;
+    cursor: pointer;
+  }
+  code {
+    background: #f2f2f2;
+    padding: 2px 5px;
+    border-radius: 4px;
+  }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>Gamma 3.2.0 Questionnaire A Simulator</h1>
+  <p class="warning">
+    Development test page only. This temporarily stands in for Qualtrics Survey A.
+  </p>
+
+  <p><strong>Subject:</strong> <span id="subject">—</span></p>
+  <p><strong>Task number:</strong> <span id="task">—</span></p>
+
+  <p>
+    Clicking the button below simulates submitting the immediate post-task questionnaire.
+    It will redirect back to Gamma using the configured return URL.
+  </p>
+
+  <button id="submitBtn">Submit Questionnaire A (Simulation)</button>
+</div>
+
+<script>
+  const params = new URLSearchParams(window.location.search);
+  const subject = params.get("subject_code") || "";
+  const taskNumber = params.get("task_number") || "";
+  const returnUrl = params.get("return_url") || "";
+
+  document.getElementById("subject").textContent = subject || "Missing";
+  document.getElementById("task").textContent = taskNumber || "Missing";
+
+  document.getElementById("submitBtn").addEventListener("click", () => {
+    if (!returnUrl) {
+      alert("No return URL was provided.");
+      return;
+    }
+
+    window.location.replace(returnUrl);
+  });
+</script>
+</body>
+</html>
