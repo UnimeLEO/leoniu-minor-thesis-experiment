@@ -245,6 +245,134 @@ The participant procedure was reduced to approximately:
 
 while assignment logic, condition routing, and task-status management occurred in the background.
 
+## Gamma — Integrated Two-Task Workflow
+
+Gamma represents the next major development stage of the experiment platform.
+
+Unlike Beta, where each task is managed as a separate assignment with its own Access Code, Gamma is designed around a participant-level sequence:
+
+`one participant + one Access Code = Task 1 + Task 2`
+
+The Gamma architecture therefore requires a new backend data model capable of storing both task conditions and task-level progress within a single participant sequence.
+
+---
+
+### Gamma 3.0.0 — Backend Database Foundation
+
+The first Gamma backend implementation introduced a dedicated Cloudflare D1 SQLite database:
+
+`minor-thesis-participants-gamma`
+
+This database is fully separated from the existing Beta database so that Gamma development does not modify or destabilise the Beta assignment system.
+
+The new database uses a participant-sequence model rather than Beta's task-level assignment model.
+
+#### Core table
+
+A new table was created:
+
+`participant_sequences`
+
+Each row represents one participant's complete two-task experimental sequence.
+
+The table stores:
+
+- unique internal sequence ID
+- unique Subject Code
+- unique Access Code
+- Task 1 experimental condition
+- Task 2 experimental condition
+- overall participant-sequence status
+- sequence creation time
+- Task 1 start time
+- Task 1 finish time
+- Task 2 start time
+- Task 2 finish time
+
+The six valid experimental conditions remain:
+
+`ah`, `ih`, `nh`, `al`, `il`, `nl`
+
+Both `task_1_condition` and `task_2_condition` are constrained at the database level to these valid values.
+
+#### Sequence status
+
+The participant sequence currently supports four overall states:
+
+- `unused`
+- `used`
+- `disabled`
+- `withdrawn`
+
+New sequences default to:
+
+`unused`
+
+Database-level `CHECK` constraints prevent invalid status values from being written.
+
+#### Task-level progress timestamps
+
+Unlike Beta, Gamma stores separate timestamps for each task:
+
+- `task_1_started_at`
+- `task_1_finished_at`
+- `task_2_started_at`
+- `task_2_finished_at`
+
+This provides the database structure required for future participant-state routing and recovery.
+
+For example, the backend will eventually be able to distinguish between states such as:
+
+`not started`
+
+`Task 1 started`
+
+`Task 1 completed`
+
+`Task 2 started`
+
+`Task 2 completed`
+
+without representing Task 1 and Task 2 as separate assignments.
+
+#### Database uniqueness constraints
+
+Both of the following fields are unique:
+
+- `subject_code`
+- `access_code`
+
+This ensures that one Subject Code corresponds to one Gamma participant sequence and that one Access Code cannot be assigned to multiple participants.
+
+This is a major structural difference from Beta, where the same participant normally had two database rows and two Access Codes.
+
+#### Database indexes
+
+Two indexes were added:
+
+`idx_gamma_sequences_status`
+
+for efficient status-based queries, and:
+
+`idx_gamma_sequences_subject_access`
+
+for efficient Subject Code + Access Code lookup during participant authentication.
+
+#### Current implementation status
+
+At this stage, the Gamma database schema has been created, but the full participant sequence logic has not yet been implemented.
+
+The current backend milestone therefore establishes the persistence layer required for later development of:
+
+- single-Access-Code authentication
+- Task 1 / Task 2 routing
+- task start and finish tracking
+- participant progress recovery
+- Qualtrics transition handling
+- Gamma Admin assignment generation and management
+
+The existing Beta database and Beta backend remain unchanged.
+
 Beta therefore became the project's first mature **participant assignment and access-management architecture**, while preserving the experimentally validated Stable task engine.
 
 It remains an important fallback implementation and development reference for later versions.
