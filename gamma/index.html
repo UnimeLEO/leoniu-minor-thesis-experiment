@@ -1,6 +1,6 @@
 <!--
 Project: leoniu-minor-thesis-experiment
-Version: 3.2.0
+Version: 3.2.1
 Codename: Gamma
 Parent baseline: Beta v3.5 (paste-enabled AC + red timers)
 Purpose: Gamma participant frontend integration build 2.
@@ -419,12 +419,20 @@ This build uses a temporary questionnaire simulator URL for end-to-end testing; 
   }
 
   .resume-banner {
+    width: 100%;
     margin-bottom: 16px;
     padding: 12px 14px;
     border: 1px solid #b8c7d9;
     background: #f3f7fb;
     border-radius: 6px;
     line-height: 1.45;
+  }
+
+  /* In AI conditions, keep the restored-session notice as a normal,
+     full-width banner above both task columns instead of letting it
+     occupy/stretch inside one grid cell. */
+  #experimentPage.dual > .resume-banner {
+    grid-column: 1 / -1;
   }
 
 </style>
@@ -438,7 +446,7 @@ This build uses a temporary questionnaire simulator URL for end-to-end testing; 
 <div class="page-wrap">
 
   <div class="panel" id="setupPage">
-    <h2>Participant Information <span class="gamma-badge">GAMMA 3.2.0</span></h2>
+    <h2>Participant Information <span class="gamma-badge">GAMMA 3.2.1</span></h2>
 
     <div class="setup-intro">
       You are invited to take part in a writing study.
@@ -531,6 +539,7 @@ This build uses a temporary questionnaire simulator URL for end-to-end testing; 
       <div class="writing-body">
         <div id="taskInfo" class="hidden">
           <strong>Topic</strong>
+          <div>Write an argumentative essay on the following topic:</div>
           <div id="topicText"></div>
         </div>
 
@@ -1208,6 +1217,10 @@ This build uses a temporary questionnaire simulator URL for end-to-end testing; 
       startBtn.textContent = "Start Task";
       return;
     }
+
+    // The participant has now actively started Task 2, so the restored-session
+    // readiness notice is no longer relevant.
+    resumeBanner.classList.add("hidden");
 
     // Reveal the assigned topic only after the task start has been confirmed.
     taskInfo.classList.remove("hidden");
