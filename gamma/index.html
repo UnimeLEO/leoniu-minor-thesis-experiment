@@ -1,18 +1,18 @@
 <!--
 Project: leoniu-minor-thesis-experiment
-Version: 3.5.3
+Version: 3.5.4
 Codename: Gamma
 Parent baseline: Beta v3.5 (paste-enabled AC + red timers)
-Purpose: Gamma participant frontend integration build 5.
-Formal participant-entry page for the study, including project information,
-ethics/contact details, and a mandatory consent/instructions acknowledgement gate.
-Real Qualtrics integration and the single-AC two-task workflow are preserved.
+Purpose: Gamma participant frontend integration build 5, patch 4.
+Adds the standalone participant-documents page link to the consent acknowledgement.
+Formal participant-entry, Real Qualtrics integration, leave warning, best-effort
+writing-assistant suppression, and the single-AC two-task workflow are preserved.
 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Minor Thesis Experiment – Gamma 3.5.3</title>
+<title>Minor Thesis Experiment – Gamma 3.5.4</title>
 <style>
   * { box-sizing: border-box; }
 
@@ -497,7 +497,7 @@ Real Qualtrics integration and the single-AC two-task workflow are preserved.
 <div class="page-wrap">
 
   <div class="panel" id="setupPage">
-    <h2>Argumentative Writing System <span class="gamma-badge">GAMMA 3.5.3</span></h2>
+    <h2>Argumentative Writing System <span class="gamma-badge">GAMMA 3.5.4</span></h2>
 
     <div class="setup-intro">
       <div class="study-title">
@@ -520,7 +520,7 @@ Real Qualtrics integration and the single-AC two-task workflow are preserved.
     <div class="consent-check">
       <input type="checkbox" id="consentAcknowledgement">
       <label for="consentAcknowledgement">
-        I confirm that I have read and understood <a href="https://drive.google.com/drive/folders/121XHz-C_vOAOjpqw3AQKe0vPVXs-qLvu?usp=sharing" target="_blank" rel="noopener noreferrer">the Consent Form, Plain Language Statement (PLS), and Participant Instructions</a>. I voluntarily agree to participate in this study and to follow the Participant Instructions. I understand that I retain all participant rights described in the Consent Form and PLS, including the right to withdraw from the study at any time.
+        I confirm that I have read and understood <a href="participant_documents.html">the Consent Form, Plain Language Statement (PLS), and Participant Instructions</a>. I voluntarily agree to participate in this study and to follow the Participant Instructions. I understand that I retain all participant rights described in the Consent Form and PLS, including the right to withdraw from the study at any time.
       </label>
     </div>
 
