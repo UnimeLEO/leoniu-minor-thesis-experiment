@@ -1,2272 +1,506 @@
-<!--
-Project: leoniu-minor-thesis-experiment
-Version: 3.5.4
-Codename: Gamma
-Parent baseline: Beta v3.5 (paste-enabled AC + red timers)
-Purpose: Gamma participant frontend integration build 5, patch 4.
-Adds the standalone participant-documents page link to the consent acknowledgement.
-Formal participant-entry, Real Qualtrics integration, leave warning, best-effort
-writing-assistant suppression, and the single-AC two-task workflow are preserved.
--->
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Minor Thesis Experiment – Gamma 3.5.4</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Participant Documents – Minor Thesis Experiment</title>
 <style>
   * { box-sizing: border-box; }
 
   body {
-    font-family: Arial, sans-serif;
     margin: 0;
     background: #f5f5f5;
     color: #111;
+    font-family: Arial, Helvetica, sans-serif;
   }
 
   .page-wrap {
-    max-width: 1400px;
-    margin: 24px auto;
-    padding: 0 20px;
+    width: min(1120px, calc(100% - 32px));
+    margin: 30px auto;
   }
 
-  .panel {
-    background: #fff;
-    border: 1px solid #ccc;
-    border-radius: 8px;
+  .page-header {
+    margin-bottom: 14px;
+    padding: 0 4px;
   }
 
-  #setupPage {
-    max-width: 760px;
-    margin: 40px auto;
-    padding: 28px;
+  .page-header h1 {
+    margin: 0 0 8px;
+    font-size: 26px;
   }
 
-  .setup-intro {
-    margin: 4px 0 20px 0;
-    padding: 14px 16px;
-    background: #fafafa;
-    border: 1px solid #ddd;
-    border-radius: 6px;
-    line-height: 1.5;
-  }
-
-  .study-title {
-    margin: 0 0 12px 0;
-    font-size: 18px;
-    font-weight: 700;
-    line-height: 1.4;
-  }
-
-  .study-meta {
-    margin-top: 14px;
-    padding-top: 12px;
-    border-top: 1px solid #ddd;
-    font-size: 14px;
-    line-height: 1.55;
-  }
-
-  .study-meta a {
-    color: inherit;
-  }
-
-  .participant-prompt {
-    margin: 18px 0 8px 0;
-    font-weight: 700;
-  }
-
-  .consent-check {
-    display: flex;
-    align-items: flex-start;
-    gap: 10px;
-    margin: 16px 0 18px 0;
-    padding: 14px 16px;
-    background: #fffdf7;
-    border: 1px solid #d8cda9;
-    border-radius: 6px;
-    line-height: 1.5;
-  }
-
-  .consent-check input[type="checkbox"] {
-    width: 18px;
-    height: 18px;
-    margin: 2px 0 0 0;
-    flex: 0 0 auto;
-  }
-
-  .consent-check label {
-    display: block;
-    margin: 0;
-    font-weight: normal;
-    cursor: pointer;
-  }
-
-  .field-hint {
-    margin-top: 5px;
-    font-size: 12px;
-    color: #666;
-  }
-
-  .access-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    max-width: 430px;
-  }
-
-  .access-row input {
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    text-align: center;
-    font-weight: 600;
-  }
-
-  .access-separator {
-    font-weight: bold;
-    color: #666;
-    user-select: none;
-  }
-
-  #subjectNumber {
-    max-width: 120px;
-    text-align: center;
-    letter-spacing: 0.08em;
-    font-weight: 600;
-  }
-
-  #accessStatus {
-    margin-top: 10px;
-    min-height: 20px;
-    font-size: 13px;
-  }
-
-  #accessStatus.error {
-    color: #8b0000;
-  }
-
-  #accessStatus.ok {
-    color: #1f6b2d;
-  }
-
-  .gamma-badge {
-    display: inline-block;
-    margin-left: 8px;
-    padding: 2px 7px;
-    border: 1px solid #bbb;
-    border-radius: 999px;
-    font-size: 11px;
-    font-weight: normal;
-    color: #555;
-    vertical-align: middle;
-  }
-
-  h2 { margin-top: 0; }
-
-  label {
-    display: block;
-    margin-top: 12px;
-    margin-bottom: 4px;
-    font-weight: bold;
-  }
-
-  input[type="text"],
-  textarea {
-    width: 100%;
-    font-size: 16px;
-    padding: 10px;
-    font-family: inherit;
-  }
-
-  button {
-    font-family: inherit;
-  }
-
-  .controls { margin-top: 16px; }
-
-  button {
-    padding: 10px 16px;
+  .project-title {
+    max-width: 940px;
     font-size: 15px;
-    margin-right: 8px;
-    margin-top: 8px;
+    line-height: 1.5;
+    color: #444;
+  }
+
+  .project-meta {
+    margin-top: 6px;
+    font-size: 13px;
+    color: #666;
+  }
+
+  .shell {
+    background: #fff;
+    border: 1px solid #cfcfcf;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+  }
+
+  .tabs {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    border-bottom: 1px solid #cfcfcf;
+    background: #f3f3f3;
+  }
+
+  .tab {
+    appearance: none;
+    border: 0;
+    border-right: 1px solid #cfcfcf;
+    border-radius: 0;
+    margin: 0;
+    padding: 16px 12px;
+    background: #f3f3f3;
+    color: #333;
+    font: inherit;
+    font-size: 16px;
+    font-weight: 700;
     cursor: pointer;
   }
 
-  button:disabled { cursor: not-allowed; }
+  .tab:last-child { border-right: 0; }
 
-  .hidden { display: none !important; }
+  .tab:hover { background: #eaeaea; }
 
-  #experimentPage.single {
-    max-width: 860px;
-    margin: 0 auto;
+  .tab.active {
+    background: #fff;
+    color: #111;
+    box-shadow: inset 0 -3px 0 #555;
   }
 
-  #experimentPage.dual {
-    display: grid;
-    grid-template-columns: minmax(360px, 0.9fr) minmax(500px, 1.1fr);
-    gap: 18px;
-    align-items: stretch;
-  }
-
-  .task-panel {
-    min-height: 720px;
+  .content-frame {
+    min-height: 650px;
+    padding: 20px 22px 18px;
     display: flex;
     flex-direction: column;
-    overflow: hidden;
   }
 
-  .panel-header {
-    padding: 16px 18px;
-    border-bottom: 1px solid #ddd;
-    background: #fafafa;
+  .back-row {
+    margin-bottom: 14px;
   }
 
-  .panel-header h2 {
-    margin: 0 0 4px 0;
-    font-size: 21px;
-  }
-
-  .subtle {
-    font-size: 13px;
-    color: #666;
-  }
-
-  .phase-banner {
-    padding: 11px 16px;
-    border-bottom: 1px solid #ddd;
+  .back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 12px;
+    border: 1px solid #bbb;
+    border-radius: 6px;
     background: #fff;
+    color: #222;
+    text-decoration: none;
+    font-weight: 700;
     font-size: 14px;
   }
 
-  .phase-banner strong { margin-right: 8px; }
+  .back-link:hover { background: #f3f3f3; }
 
-  /* AI */
-  #aiPanel {
-    height: clamp(650px, calc(100vh - 48px), 820px);
-    min-height: 0;
-    max-height: 820px;
+  .view {
+    flex: 1;
   }
 
-  #aiPanel .panel-header,
-  #aiPanel .phase-banner,
-  #aiPanel .chat-input-wrap {
-    flex-shrink: 0;
+  .view[hidden] { display: none; }
+
+  .view-title {
+    margin: 2px 0 12px;
+    font-size: 22px;
   }
 
-  #chatMessages {
-    flex: 1 1 auto;
-    min-height: 0;
+  .view-note {
+    margin: -2px 0 14px;
+    color: #666;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .scroll-box {
+    height: 500px;
     overflow-y: auto;
-    overflow-x: hidden;
-    padding: 16px;
-    background: #fff;
+    overscroll-behavior: contain;
     scrollbar-gutter: stable;
+    border: 1px solid #cfcfcf;
+    border-radius: 6px;
+    background: #fff;
+    padding: 24px 28px;
+    line-height: 1.58;
   }
 
-  .msg {
-    max-width: 88%;
-    margin-bottom: 12px;
-    padding: 10px 12px;
-    border-radius: 10px;
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-    line-height: 1.4;
+  .scroll-box h2 {
+    margin: 0 0 6px;
+    font-size: 24px;
   }
 
-  .msg.user {
-    margin-left: auto;
-    background: #ececec;
+  .scroll-box h3 {
+    margin: 24px 0 8px;
+    font-size: 18px;
   }
 
-  .msg.ai {
-    margin-right: auto;
-    background: #f7f7f7;
-    border: 1px solid #ddd;
-    white-space: normal;
+  .scroll-box p {
+    margin: 10px 0;
   }
 
-  .msg.ai p {
-    margin: 0 0 0.65em 0;
-  }
-
-  .msg.ai p:last-child {
-    margin-bottom: 0;
-  }
-
-  .msg.ai ul,
-  .msg.ai ol {
-    margin: 0.45em 0 0.7em 1.35em;
+  .scroll-box ol {
+    margin: 12px 0 12px 22px;
     padding: 0;
   }
 
-  .msg.ai h1,
-  .msg.ai h2,
-  .msg.ai h3,
-  .msg.ai h4 {
-    margin: 0.8em 0 0.35em 0;
-    line-height: 1.25;
+  .scroll-box li {
+    margin: 0 0 11px;
+    padding-left: 4px;
   }
 
-  .msg.ai h1:first-child,
-  .msg.ai h2:first-child,
-  .msg.ai h3:first-child,
-  .msg.ai h4:first-child {
-    margin-top: 0;
+  .doc-meta {
+    margin-bottom: 18px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #ddd;
+    color: #555;
+    font-size: 13px;
   }
 
-  .msg.ai code {
-    background: #eee;
-    padding: 0.08em 0.28em;
-    border-radius: 4px;
+  .signature-line {
+    margin-top: 22px;
   }
 
-  .chat-input-wrap {
-    border-top: 1px solid #ddd;
-    padding: 12px;
-    background: #fafafa;
+  .instructions-intro {
+    margin: 0 0 18px;
+    line-height: 1.55;
+    color: #444;
   }
 
-  #promptBox {
-    height: 84px;
-    min-height: 84px;
-    max-height: 120px;
-    resize: vertical;
+  .version-card {
+    border: 1px solid #d5d5d5;
+    border-radius: 7px;
+    margin-bottom: 16px;
+    overflow: hidden;
   }
 
-  .chat-controls {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+  .version-card h3 {
+    margin: 0;
+    padding: 13px 16px;
+    background: #f7f7f7;
+    border-bottom: 1px solid #ddd;
+    font-size: 17px;
   }
 
-  /* Writing */
-  .writing-body {
-    padding: 18px;
+  .download-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    padding: 16px;
+  }
+
+  .download-link {
+    min-height: 76px;
     display: flex;
     flex-direction: column;
-    flex: 1;
-  }
-
-  #taskInfo {
-    margin-bottom: 12px;
-    padding: 12px;
-    background: #fafafa;
-    border: 1px solid #ddd;
+    justify-content: center;
+    gap: 5px;
+    padding: 12px 14px;
+    border: 1px solid #bbb;
     border-radius: 6px;
+    background: #fff;
+    color: #111;
+    text-decoration: none;
+    line-height: 1.35;
   }
 
-  #topicText {
-    margin-top: 8px;
-    line-height: 1.5;
+  .download-link:hover {
+    background: #f5f5f5;
+    border-color: #888;
   }
 
-  #planningInstruction {
-    margin-bottom: 12px;
-    padding: 12px;
-    background: #fafafa;
-    border: 1px solid #ddd;
-    border-radius: 6px;
-  }
-
-  #writingBox {
-    flex: 1;
-    min-height: 390px;
-    resize: vertical;
-    line-height: 1.5;
-  }
-
-  #statusBar {
-    margin-top: 8px;
-    font-size: 13px;
-    color: #777;
-  }
-
-  .status-row {
-    display: flex;
-    gap: 18px;
-    flex-wrap: wrap;
-  }
-
-  #mainTimer,
-  #aiTimer {
-    font-size: 22px;
+  .download-link .condition {
     font-weight: 700;
-    color: #c00000;
   }
 
-  @media (max-width: 900px) {
-    #experimentPage.dual {
+  .download-link .action {
+    color: #555;
+    font-size: 13px;
+  }
+
+  .download-note {
+    margin-top: 8px;
+    padding: 11px 13px;
+    background: #fafafa;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    color: #555;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .nav-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 18px;
+    padding-top: 16px;
+    border-top: 1px solid #e0e0e0;
+  }
+
+  .nav-btn {
+    min-width: 104px;
+    padding: 9px 16px;
+    border: 1px solid #aaa;
+    border-radius: 6px;
+    background: #fff;
+    color: #111;
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .nav-btn:hover:not(:disabled) { background: #f1f1f1; }
+
+  .nav-btn:disabled {
+    background: #eee;
+    color: #aaa;
+    border-color: #d0d0d0;
+    cursor: not-allowed;
+  }
+
+  @media (max-width: 760px) {
+    .page-wrap {
+      width: min(100% - 18px, 1120px);
+      margin: 12px auto;
+    }
+
+    .tab {
+      padding: 13px 7px;
+      font-size: 13px;
+    }
+
+    .content-frame {
+      min-height: 0;
+      padding: 14px;
+    }
+
+    .scroll-box {
+      height: 58vh;
+      min-height: 390px;
+      padding: 18px;
+    }
+
+    .download-grid {
       grid-template-columns: 1fr;
     }
-
-    .task-panel {
-      min-height: 600px;
-    }
-
-    #aiPanel {
-      height: 650px;
-      min-height: 650px;
-      max-height: 650px;
-    }
   }
-
-  .next-step-btn {
-    background: #e6e6e6;
-    color: #888;
-    border-color: #bbb;
-    font-weight: 700;
-  }
-
-  .next-step-btn.ready {
-    background: #c00000;
-    color: #fff;
-    border-color: #c00000;
-  }
-
-  .next-step-btn.ready:hover {
-    background: #a00000;
-  }
-
-  .modal-backdrop {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.48);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 20px;
-    z-index: 9999;
-  }
-
-  .modal-card {
-    width: min(620px, 100%);
-    background: #fff;
-    border-radius: 10px;
-    padding: 24px;
-    box-shadow: 0 12px 40px rgba(0,0,0,0.28);
-  }
-
-  .modal-card h3 {
-    margin-top: 0;
-    margin-bottom: 12px;
-  }
-
-  .modal-card p {
-    margin: 8px 0;
-    line-height: 1.55;
-  }
-
-  .modal-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 10px;
-    margin-top: 20px;
-    flex-wrap: wrap;
-  }
-
-  .confirm-btn {
-    background: #c00000;
-    color: #fff;
-    border-color: #c00000;
-    font-weight: 700;
-  }
-
-  .resume-banner {
-    width: 100%;
-    margin-bottom: 16px;
-    padding: 12px 14px;
-    border: 1px solid #b8c7d9;
-    background: #f3f7fb;
-    border-radius: 6px;
-    line-height: 1.45;
-  }
-
-  /* In AI conditions, keep the restored-session notice as a normal,
-     full-width banner above both task columns instead of letting it
-     occupy/stretch inside one grid cell. */
-  #experimentPage.dual > .resume-banner {
-    grid-column: 1 / -1;
-  }
-
 </style>
-  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-
-<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>
-
 </head>
 <body>
 <div class="page-wrap">
+  <header class="page-header">
+    <h1>Participant Documents</h1>
+    <div class="project-title">
+      Learning English as a second language in Chinese international students: The role of pre-task planning on second language writing performance
+    </div>
+    <div class="project-meta">University of Melbourne Human Research Ethics Approval · Project ID Number: 29617</div>
+  </header>
 
-  <div class="panel" id="setupPage">
-    <h2>Argumentative Writing System <span class="gamma-badge">GAMMA 3.5.4</span></h2>
+  <section class="shell">
+    <nav class="tabs" aria-label="Participant document sections">
+      <button class="tab active" type="button" data-index="0" aria-selected="true">Consent Form</button>
+      <button class="tab" type="button" data-index="1" aria-selected="false">PLS</button>
+      <button class="tab" type="button" data-index="2" aria-selected="false">Participant Instructions</button>
+    </nav>
 
-    <div class="setup-intro">
-      <div class="study-title">
-        Learning English as a second language in Chinese international students: The role of pre-task planning on second language writing performance
+    <div class="content-frame">
+      <div class="back-row">
+        <a class="back-link" href="./" aria-label="Back to the experiment page">← Back to Experiment</a>
       </div>
 
-      <div>
-        This study investigates the role of pre-task planning in English second-language argumentative writing among Chinese international students. Participants complete two timed argumentative writing tasks under assigned planning conditions, followed by post-task questionnaires.
-      </div>
-
-      <div class="study-meta">
-        <div><strong>Project ID Number:</strong> 29617</div>
-        <div><strong>Supervisor:</strong> Dr Yizhou Wang &nbsp; Email: <a href="mailto:yizwang3@unimelb.edu.au">yizwang3@unimelb.edu.au</a></div>
-        <div><strong>Researcher:</strong> Jiashuo Leo Niu &nbsp; Email: <a href="mailto:jiashuon@student.unimelb.edu.au">jiashuon@student.unimelb.edu.au</a></div>
-      </div>
-    </div>
-
-    <div class="participant-prompt">Please enter the participant information provided by the researcher.</div>
-
-    <div class="consent-check">
-      <input type="checkbox" id="consentAcknowledgement">
-      <label for="consentAcknowledgement">
-        I confirm that I have read and understood <a href="participant_documents.html">the Consent Form, Plain Language Statement (PLS), and Participant Instructions</a>. I voluntarily agree to participate in this study and to follow the Participant Instructions. I understand that I retain all participant rights described in the Consent Form and PLS, including the right to withdraw from the study at any time.
-      </label>
-    </div>
-
-    <label for="subjectNumber">Subject code</label>
-    <div class="access-row" style="max-width: 180px;">
-      <span class="access-separator" style="font-size: 18px; color: #111;">P</span>
-      <input
-        type="text"
-        id="subjectNumber"
-        maxlength="2"
-        placeholder="e.g., 01"
-        inputmode="numeric"
-        autocomplete="off"
-        spellcheck="false"
-        disabled>
-    </div>
-    <div class="field-hint">Enter the two-digit subject number.</div>
-
-    <label>Access code</label>
-    <div class="access-row">
-      <input
-        type="text"
-        id="accessCodeA"
-        maxlength="4"
-        placeholder=""
-        autocomplete="off"
-        spellcheck="false"
-        disabled>
-      <span class="access-separator">–</span>
-      <input
-        type="text"
-        id="accessCodeB"
-        maxlength="4"
-        placeholder=""
-        autocomplete="off"
-        spellcheck="false"
-        disabled>
-    </div>
-    <div class="field-hint">Enter the 8-character access code provided by the researcher.</div>
-    <div id="accessStatus"></div>
-
-    <div class="controls">
-      <button id="continueBtn" disabled>Continue</button>
-    </div>
-  </div>
-
-  <div id="experimentPage" class="hidden">
-
-    <div id="resumeBanner" class="resume-banner hidden">
-      Session restored successfully. You may begin Task 2 when you are ready.
-    </div>
-
-    <!-- AI panel: only used for a* conditions -->
-    <section class="panel task-panel hidden" id="aiPanel">
-      <div class="panel-header">
-        <h2>AI Planning</h2>
-        <div class="subtle">GPT-assisted planning</div>
-      </div>
-
-      <div class="phase-banner">
-        <strong>AI planning time:</strong>
-        <span id="aiTimer">10:00</span>
-      </div>
-
-      <div id="chatMessages">
-        <div class="msg ai">AI planning is ready. Enter a prompt after the task begins.</div>
-      </div>
-
-      <div class="chat-input-wrap">
-        <textarea id="promptBox" data-gramm="false" disabled placeholder="AI planning will begin after you press Start Task."></textarea>
-        <div class="chat-controls">
-          <span class="subtle" id="aiStatus">Not started</span>
-          <button id="sendBtn" disabled>Send</button>
+      <section class="view" data-view="0">
+        <h2 class="view-title">Consent Form</h2>
+        <div class="view-note">Please read the Consent Form below carefully.</div>
+        <div class="scroll-box" id="consentScroll" tabindex="0">
+          <div class="doc-meta">Project ID Number: 29617 · Project Start Date: July 2026 · Version: 3</div>
+          <h2>Consent Form</h2>
+          <p><strong>School of Languages and Linguistics, Faculty of Arts</strong></p>
+          <p><strong>Project:</strong> Learning English as a second language in Chinese international students: The role of pre-task planning on English writing performance</p>
+          <p>
+            <strong>Responsible Researcher:</strong> Dr. Yizhou Wang<br>
+            <strong>Student Investigator:</strong> Leo Niu (Master of Applied Linguistics)<br>
+            <strong>Tel:</strong> +61 04 5065 2270 &nbsp; <strong>Email:</strong> yizwang3@unimelb.edu.au
+          </p>
+          <p><strong>Name of Participant:</strong> ________________________________</p>
+          <ol>
+            <li>I consent to participate in this project, the details of which have been explained to me, and I have been provided with a Plain Language Statement to keep.</li>
+            <li>I understand that the purpose of this research is to investigate how pre-task planning affects the English writing performance of Chinese international students.</li>
+            <li>I understand that my participation in this project is for research purposes only.</li>
+            <li>I acknowledge that the possible effects of participating in this research project have been explained to my satisfaction.</li>
+            <li>In this project, I will be required to complete a language background questionnaire and a series of English writing tasks on a computer.</li>
+            <li>I understand that my written responses and writing process will be recorded by the computer software. This may include keystrokes, pauses, revisions, and mouse movements data.</li>
+            <li>I understand that my participation is voluntary and that I am free to withdraw from this project at any time without explanation or disadvantage, and to withdraw any unprocessed data I have provided.</li>
+            <li>I understand that the data from this research will be stored at the University of Melbourne and destroyed five years after publication. The data will be used only for this research project.</li>
+            <li>I understand that the confidentiality of the information I provide will be protected, subject to any legal requirements. My data will be password-protected and accessible only to the named researchers.</li>
+            <li>I understand that, after I sign and return this consent form, it will be retained by the researchers.</li>
+          </ol>
+          <p class="signature-line"><strong>Participant Signature:</strong> ____________________ &nbsp;&nbsp; <strong>Date:</strong> ____________________</p>
         </div>
-      </div>
-    </section>
+      </section>
 
-    <!-- Writing / planning panel -->
-    <section class="panel task-panel" id="writingPanel">
-      <div class="panel-header">
-        <h2>Writing Task</h2>
-        <div class="subtle" id="participantLine"></div>
-      </div>
+      <section class="view" data-view="1" hidden>
+        <h2 class="view-title">Plain Language Statement (PLS)</h2>
+        <div class="view-note">Please read the Plain Language Statement below carefully.</div>
+        <div class="scroll-box" id="plsScroll" tabindex="0">
+          <div class="doc-meta">Project ID Number: 29617 · Plain Language Statement ver. 3 · July 2026</div>
+          <h2>Plain Language Statement</h2>
+          <p><strong>School of Languages and Linguistics, Faculty of Arts</strong></p>
+          <p><strong>Project:</strong> Learning English as a second language in Chinese international students: The role of pre-task planning on second language writing performance</p>
+          <p>
+            <strong>Responsible researcher:</strong> Dr Yizhou Wang<br>
+            <strong>Student investigator:</strong> Leo Niu (Master of Applied Linguistics)<br>
+            <strong>Tel:</strong> +61 04 5065 2270 &nbsp; <strong>Email:</strong> yizwang3@unimelb.edu.au
+          </p>
 
-      <div class="phase-banner">
-        <strong>Current phase:</strong>
-        <span id="phaseName">Not started</span>
-      </div>
+          <h3>Introduction</h3>
+          <p>Thank you for your interest in participating in this research project. The following few pages will provide you with further information about the project, so that you can decide if you would like to take part in this research.</p>
+          <p>Please take the time to read this information carefully. You may ask questions about anything you don’t understand or want to know more about.</p>
+          <p>Your participation is voluntary. If you don’t wish to take part, you don’t have to. If you begin participating, you can also stop at any time.</p>
 
-      <div class="writing-body">
-        <div id="taskInfo" class="hidden">
-          <strong>Topic</strong>
-          <div>Write an argumentative essay on the following topic:</div>
-          <div id="topicText"></div>
+          <h3>What is this research about?</h3>
+          <p>This research project investigates how planning before a writing task affects English writing performance. In particular, we are interested in whether having time to think about and organise ideas before writing influences the way people complete an English writing task.</p>
+          <p>The study focuses on Chinese international students studying in Australia. Participants will complete English writing tasks under different planning conditions. For example, before some writing tasks, you may be given time to plan your ideas and make notes. For other tasks, you may be asked to begin writing with little or no planning time.</p>
+          <p>We will examine different aspects of the writing process and the written texts, such as how ideas are organised, how quickly the text is produced, and how language is used. The findings may help researchers better understand the role of pre-task planning in second-language writing and may inform the design of English language learning and teaching activities.</p>
+
+          <h3>What will I be asked to do?</h3>
+          <p>You will be asked to take part in several research activities. We will arrange the sessions at a suitable time for you. The activities do not necessarily need to be completed in one sitting.</p>
+          <p>First, you will complete a questionnaire about your language background and your experience of learning and using English. This will take approximately 15 minutes.</p>
+          <p>The main part of the study will involve completing a series of English writing tasks on a computer. Before some tasks, you will be given time to think about the topic, organise your ideas, and make planning notes. In other tasks, you may be asked to begin writing immediately or after a shorter planning period. The writing activities will take approximately 45 minutes to 1 hour.</p>
+          <p>The computer software will record your written responses. It may also record information about the writing process, such as when you type, pause, revise, or delete parts of your text. We are interested in general patterns of writing behaviour rather than evaluating you as an individual. Here is a schematic illustration of the experiment setup.</p>
+
+          <h3>What are the possible benefits?</h3>
+          <p>Participating in this study offers you a unique opportunity to reflect on and enhance your English language learning journey. As you share your experiences, challenges, and successes, you'll gain deeper insights into your own learning strategies and areas for improvement. This process of reflection can significantly boost your self-awareness and renew your motivation to master English. To compensate for your time, all participants will receive a little gift after completing the activities.</p>
+          <p>Additionally, you might discover new learning resources and effective strategies through interactions with researchers and potentially other participants. Such insights can be invaluable in shaping a more effective and enjoyable language learning experience. Moreover, your contribution to this study will help improve English language education for future learners, giving you a sense of accomplishment and connection to a wider community of language learners.</p>
+          <p>You may also receive personalized feedback on your writing skills, offering a clear direction for your future efforts. Beyond the academic benefits, engaging in this study can enhance your cultural awareness and confidence in using English in a variety of settings. It's not just about the language; it's an opportunity for personal growth and becoming part of an effort to make learning English a more supportive and effective experience for everyone involved.</p>
+
+          <h3>What are the possible risks?</h3>
+          <p>We want to assure you that the risks associated with participating in this study are minimal. The methods we're using are widely accepted in linguistic research, and many of the activities, such as language background questionnaire, will be familiar to you based on your existing experiences with learning English. We understand that joining this study means dedicating about 1 hour of your time to our activities.</p>
+          <p>We also acknowledge that some parts of the study might feel repetitive or lead to fatigue. To help with this, we will schedule breaks between different sections of the experiment, giving you time to rest. It's important to us that you have a comfortable and positive experience during the study. Your participation is entirely voluntary, and if at any point you choose not to continue, you can opt out without any repercussions. Our aim is to make this study not only valuable in terms of the insights it generates about language learning but also an engaging and accommodating experience for you.</p>
+
+          <h3>Do I have to take part?</h3>
+          <p>No. Your decision to participate in this study is completely voluntary, meaning you have the freedom to join without any pressure or obligation. We want to ensure you're fully informed about the study's aims, what it involves, your rights as a participant, and any potential risks or benefits. This way, your choice to be part of our research is made with a clear understanding of what to expect.</p>
+          <p>If at any point you decide this study isn't right for you, you can withdraw your participation immediately. Your decision to leave will not affect your access to services or rights in any way. Should you choose to withdraw, you also have the option to decide what happens with the data collected from you up to that point — whether it can still be used or if you prefer it to be deleted.</p>
+          <p>To support your voluntary participation, we are committed to maintaining a transparent, respectful, and ethical research environment. Your privacy and confidentiality are paramount, and all personal information will be protected and used solely for the purposes outlined. We encourage open communication and invite you to reach out to us at any stage if you have questions, need more information, or decide to withdraw from the study.</p>
+          <p>Additionally, we can provide regular updates and feedback about the study's progress and findings. Our aim is to make your participation in this study a positive and enriching experience, fully respecting your rights and well-being throughout the process.</p>
+
+          <h3>Will I hear about the results of this project?</h3>
+          <p>The insights gained from this study are invaluable, not only to our understanding of language learning, English writing processes but also to the broader academic community and future educational strategies. Our findings will be meticulously analysed and used for scholarly research, with the ultimate goal of publishing our results in academic journals and presenting them at relevant conferences.</p>
+          <p>Once these results are officially published, we will prepare a summary report. This report will distil our findings into easy-to-understand language, ensuring you can grasp the key outcomes and implications of the study without needing to navigate through academic terminologies. We are committed to keeping you informed and will make this summary available to you, acknowledging your crucial role in this research.</p>
+
+          <h3>What will happen to information about me?</h3>
+          <p>We take the privacy of your information very seriously in our study. All the data we collect from you will be kept safe on a university computer, which only the research team can access because it's password-protected. After we've published our findings, we'll hold onto the data for five more years just in case we need to look back at it, but then we'll securely delete everything. This means that your information will be kept private and used only for this research project, and you can be sure that we're doing everything we can to protect your confidentiality. All data collected in the project will be used only for this research project (i.e. no future use).</p>
+
+          <h3>Where can I get further information?</h3>
+          <p>If you would like more information about the project, please contact Dr Yizhou Wang at yizwang3@unimelb.edu.au.</p>
+
+          <h3>Will participation affect my success or grades?</h3>
+          <p>No. Participating in the current study is completely voluntary and it will NOT affect your coursework or research achievements at the University of Melbourne.</p>
+
+          <h3>Who can I contact if I have any concerns about the project?</h3>
+          <p>This project has human research ethics approval from The University of Melbourne [Project No. 29617]. If you have any concerns or complaints about the conduct of this research project, which you do not wish to discuss with the research team, you should contact the Research Integrity Administrator, Office of Research Ethics and Integrity, University of Melbourne, VIC 3010. Tel: +61 3 8344 1376 or Email: research-integrity@unimelb.edu.au. All complaints will be treated confidentially. In any correspondence please provide the name of the research team and/or the name or ethics ID number of the research project.</p>
         </div>
+      </section>
 
-        <div id="planningInstruction" class="hidden"></div>
+      <section class="view" data-view="2" hidden>
+        <h2 class="view-title">Participant Instructions</h2>
+        <p class="instructions-intro">Please select the version and planning condition indicated by the researcher.</p>
 
-        <textarea
-          id="writingBox"
-          data-gramm="false"
-          disabled
-          spellcheck="false"
-          autocomplete="off"
-          autocorrect="off"
-          autocapitalize="off"
-          placeholder="The writing box will be enabled when the writing phase begins."></textarea>
-
-        <div id="statusBar">
-          <div class="status-row">
-            <span id="mainTimer">Time remaining: --:--</span>
-            <span id="wordCount">Word count: 0</span>
+        <div class="version-card">
+          <h3>Version A (English ver)</h3>
+          <div class="download-grid">
+            <a class="download-link" href="docs/aip-en.pdf" download><span class="condition">AI-assisted Planning</span><span class="action">Download</span></a>
+            <a class="download-link" href="docs/ip-en.pdf" download><span class="condition">Individual Planning</span><span class="action">Download</span></a>
+            <a class="download-link" href="docs/np-en.pdf" download><span class="condition">No Planning</span><span class="action">Download</span></a>
           </div>
         </div>
 
-        <div class="controls">
-          <button id="startBtn">Start Task</button>
-          <button id="endPlanningBtn" class="hidden" disabled>Finish Planning Early</button>
-          <button id="stopBtn" disabled>Finish</button>
-          <button id="downloadPackageBtn" disabled>Download Data Package (.zip)</button>
-          <button id="nextStepBtn" class="next-step-btn" disabled>Next Step</button>
+        <div class="version-card">
+          <h3>Version B (Chinese ver)</h3>
+          <div class="download-grid">
+            <a class="download-link" href="docs/aip-cn.pdf" download><span class="condition">AI-assisted Planning</span><span class="action">Download</span></a>
+            <a class="download-link" href="docs/ip-cn.pdf" download><span class="condition">Individual Planning</span><span class="action">Download</span></a>
+            <a class="download-link" href="docs/np-cn.pdf" download><span class="condition">No Planning</span><span class="action">Download</span></a>
+          </div>
         </div>
-      </div>
-    </section>
 
-  </div>
-</div>
+        <div class="version-card">
+          <h3>Version C (Easy guidelines)</h3>
+          <div class="download-grid">
+            <a class="download-link" href="docs/aip-easy.pdf" download><span class="condition">AI-assisted Planning</span><span class="action">Download</span></a>
+            <a class="download-link" href="docs/ip-easy.pdf" download><span class="condition">Individual Planning</span><span class="action">Download</span></a>
+            <a class="download-link" href="docs/np-easy.pdf" download><span class="condition">No Planning</span><span class="action">Download</span></a>
+          </div>
+        </div>
 
+      </section>
 
-  <div id="nextStepModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="nextStepModalTitle">
-    <div class="modal-card">
-      <h3 id="nextStepModalTitle">Important / 重要</h3>
-      <p>
-        You are about to leave the writing task and continue to the next step.
-        Please confirm that the ZIP data package has been downloaded and saved locally.
-      </p>
-      <p>
-        你即将离开当前写作任务并进入下一步骤。请确认 ZIP 数据包已经下载并保存在本地。
-      </p>
-      <p>
-        After continuing, you should not return to this completed writing task through the normal study workflow.
-      </p>
-      <p>
-        继续后，请不要通过正常实验流程返回已经完成的写作任务。
-      </p>
-      <div class="modal-actions">
-        <button id="cancelNextStepBtn">Cancel / 取消</button>
-        <button id="confirmNextStepBtn" class="confirm-btn">Confirm and Continue / 确认并继续</button>
+      <div class="nav-row">
+        <button class="nav-btn" id="previousBtn" type="button" disabled>Previous</button>
+        <button class="nav-btn" id="nextBtn" type="button">Next</button>
       </div>
     </div>
-  </div>
+  </section>
+</div>
 
 <script>
-  // ---------------- CONFIG ----------------
-  const PLANNING_MINUTES = 10;
-  const WRITING_MINUTES = 30;
-
-  // IMPORTANT: Replace this with your deployed Cloudflare Worker URL.
-  // Example: https://minor-thesis-ai-proxy.YOUR-SUBDOMAIN.workers.dev
-  // Gamma Worker will handle Gamma access/session authorization and AI proxying.
-  const WORKER_URL = "https://mt-gamma-ai.njsukleo.workers.dev/";
-
-  // Final Qualtrics survey endpoints.
-  const TASK1_QUESTIONNAIRE_URL = "https://q.surveys.unimelb.edu.au/jfe/form/SV_2sEOjFBSgrYfAG2";
-  const TASK2_QUESTIONNAIRE_URL = "https://q.surveys.unimelb.edu.au/jfe/form/SV_brBQtH7noNvP83k";
-
-  // Qualtrics Survey A should redirect here after submission.
-  const TASK2_RESUME_URL =
-    window.location.origin +
-    window.location.pathname +
-    "?resume=task2";
-
-  const GAMMA_SESSION_KEY = "mt_gamma_sequence_session_v3";
-
-  // Replace these placeholders later with the final experimental prompts.
-  const TOPICS = {
-    h: "Should university education be free for students?",
-    l: "Should farmers receive lower tax rates than other businesses?"
-  };
-
-
-  // ---------------- DOM ----------------
-  const setupPage = document.getElementById("setupPage");
-  const experimentPage = document.getElementById("experimentPage");
-  const aiPanel = document.getElementById("aiPanel");
-
-  const subjectNumberInput = document.getElementById("subjectNumber");
-  const accessCodeAInput = document.getElementById("accessCodeA");
-  const accessCodeBInput = document.getElementById("accessCodeB");
-  const accessStatus = document.getElementById("accessStatus");
-  const continueBtn = document.getElementById("continueBtn");
-  const consentAcknowledgement = document.getElementById("consentAcknowledgement");
-
-  const participantLine = document.getElementById("participantLine");
-  const taskInfo = document.getElementById("taskInfo");
-  const topicText = document.getElementById("topicText");
-  const planningInstruction = document.getElementById("planningInstruction");
-
-  const phaseName = document.getElementById("phaseName");
-  const mainTimer = document.getElementById("mainTimer");
-  const wordCountDisplay = document.getElementById("wordCount");
-
-  const writingBox = document.getElementById("writingBox");
-  const startBtn = document.getElementById("startBtn");
-  const endPlanningBtn = document.getElementById("endPlanningBtn");
-  const stopBtn = document.getElementById("stopBtn");
-  const downloadPackageBtn = document.getElementById("downloadPackageBtn");
-  const nextStepBtn = document.getElementById("nextStepBtn");
-
-  const resumeBanner = document.getElementById("resumeBanner");
-  const nextStepModal = document.getElementById("nextStepModal");
-  const cancelNextStepBtn = document.getElementById("cancelNextStepBtn");
-  const confirmNextStepBtn = document.getElementById("confirmNextStepBtn");
-
-  const chatMessages = document.getElementById("chatMessages");
-  const promptBox = document.getElementById("promptBox");
-  const sendBtn = document.getElementById("sendBtn");
-  const aiTimer = document.getElementById("aiTimer");
-  const aiStatus = document.getElementById("aiStatus");
-
-  // ---------------- STATE ----------------
-  let topicCode = "";       // internal condition code resolved from server-side sequence
-  let activeAccessCode = "";   // kept in memory only for this page session
-  let activeTaskNumber = null; // 1 or 2, resolved by Gamma Worker
-  let serverTaskStartedAt = null;
-  let finishRequestInFlight = false;
-  let pendingFinishAutoStopped = false;
-  let leaveWarningActive = false;
-  let zipDownloadInitiated = false;
-  let planningMode = "";   // a / i / n
-  let familiarity = "";    // h / l
-  let phase = "setup";     // setup / ready / planning / writing / finishing / finish_pending / finished
-  let aiAbortController = null;
-
-  let phaseStartTime = null;
-  let timerInterval = null;
-  let phaseLimitMs = null;
-
-  let writingStartTime = null;
-  let planningDurationMs = 0;
-  let writingDurationMs = 0;
-  let planningEndReason = "not_applicable";
-  let writingEndReason = "";
-  let keystrokeLog = [];
-  let minuteSnapshots = [];
-  let lastSnapshotMinute = 0;
-  let chatLog = [];
-  let aiRequestInFlight = false;
-
-  // ---------------- HELPERS ----------------
-  function nowMs() {
-    return performance.now();
-  }
-
-  function formatRemaining(ms) {
-    const safeMs = Math.max(0, ms);
-    const totalSeconds = Math.ceil(safeMs / 1000);
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    return String(minutes).padStart(2, "0") + ":" + String(seconds).padStart(2, "0");
-  }
-
-  function sanitizeFilename(name) {
-    return String(name || "")
-      .trim()
-      .replace(/\s+/g, "_")
-      .replace(/[^a-zA-Z0-9_-]/g, "_");
-  }
-
-  function countWords(text) {
-    const trimmed = text.trim();
-    if (!trimmed) return 0;
-    return trimmed.split(/\s+/).length;
-  }
-
-  function updateWordCountDisplay() {
-    wordCountDisplay.textContent = "Word count: " + countWords(writingBox.value);
-  }
-
-  function getConditionLabel() {
-    const planNames = { a: "AI planning", i: "Self-planning", n: "No planning" };
-    const famNames = { h: "High familiarity", l: "Low familiarity" };
-    return planNames[planningMode] + " | " + famNames[familiarity];
-  }
-
-  // ---------------- SETUP / ROUTER ----------------
-  function normaliseSubjectNumber(value) {
-    return String(value || "")
-      .replace(/\D/g, "")
-      .slice(0, 2);
-  }
-
-  function getSubjectCode() {
-    return "P" + subjectNumberInput.value;
-  }
-
-  function normaliseAccessPart(value) {
-    return String(value || "")
-      .toUpperCase()
-      .replace(/[^A-Z0-9]/g, "")
-      .slice(0, 4);
-  }
-
-  function getAccessCode() {
-    return accessCodeAInput.value + "-" + accessCodeBInput.value;
-  }
-
-  function showAccessStatus(message, type = "") {
-    accessStatus.textContent = message;
-    accessStatus.className = type;
-  }
-
-  function validateSetupFields() {
-    const subjectCode = getSubjectCode();
-    const accessCode = getAccessCode();
-
-    if (!/^P\d{2}$/.test(subjectCode)) {
-      showAccessStatus("Please enter a valid two-digit subject number.", "error");
-      subjectNumberInput.focus();
-      return false;
-    }
-
-    if (!/^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(accessCode)) {
-      showAccessStatus("Please enter the complete 8-character access code.", "error");
-      accessCodeAInput.focus();
-      return false;
-    }
-
-    return true;
-  }
-
-
-  function splitAccessCodeForInputs(accessCode) {
-    const compact = String(accessCode || "")
-      .toUpperCase()
-      .replace(/[^A-Z0-9]/g, "");
-
-    if (compact.length !== 8) return false;
-
-    accessCodeAInput.value = compact.slice(0, 4);
-    accessCodeBInput.value = compact.slice(4, 8);
-    return true;
-  }
-
-  function saveGammaSessionForReturn() {
-    const payload = {
-      subject_code: getSubjectCode(),
-      access_code: activeAccessCode,
-      expected_task_number: 2,
-      saved_at: Date.now()
-    };
-
-    sessionStorage.setItem(
-      GAMMA_SESSION_KEY,
-      JSON.stringify(payload)
-    );
-  }
-
-  function clearGammaSession() {
-    sessionStorage.removeItem(GAMMA_SESSION_KEY);
-  }
-
-  function readGammaSession() {
-    try {
-      const raw = sessionStorage.getItem(GAMMA_SESSION_KEY);
-      if (!raw) return null;
-
-      const parsed = JSON.parse(raw);
-
-      if (
-        !/^P\d{2}$/.test(String(parsed?.subject_code || "")) ||
-        !/^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(String(parsed?.access_code || "")) ||
-        Number(parsed?.expected_task_number) !== 2
-      ) {
-        return null;
-      }
-
-      return parsed;
-    } catch (_) {
-      return null;
-    }
-  }
-
-  function setNextStepAvailability(enabled) {
-    nextStepBtn.disabled = !enabled;
-    nextStepBtn.classList.toggle("ready", enabled);
-  }
-
-  function openNextStepModal() {
-    if (!zipDownloadInitiated || phase !== "finished") return;
-    nextStepModal.classList.remove("hidden");
-  }
-
-  function closeNextStepModal() {
-    nextStepModal.classList.add("hidden");
-  }
-
-  function buildTask1QuestionnaireUrl() {
-    const target = new URL(
-      TASK1_QUESTIONNAIRE_URL,
-      window.location.href
-    );
-
-    target.searchParams.set(
-      "subject_code",
-      getSubjectCode()
-    );
-    target.searchParams.set(
-      "task_number",
-      String(activeTaskNumber)
-    );
-    target.searchParams.set(
-      "return_url",
-      TASK2_RESUME_URL
-    );
-
-    return target.toString();
-  }
-
-  function buildTask2QuestionnaireUrl() {
-    const target = new URL(
-      TASK2_QUESTIONNAIRE_URL,
-      window.location.href
-    );
-
-    target.searchParams.set(
-      "subject_code",
-      getSubjectCode()
-    );
-    target.searchParams.set(
-      "task_number",
-      String(activeTaskNumber)
-    );
-
-    return target.toString();
-  }
-
-  function updateParticipantEntryGate() {
-    const allowed = consentAcknowledgement.checked;
-
-    subjectNumberInput.disabled = !allowed;
-    accessCodeAInput.disabled = !allowed;
-    accessCodeBInput.disabled = !allowed;
-    continueBtn.disabled = !allowed;
-
-    if (!allowed) {
-      showAccessStatus("");
-    }
-  }
-
-  function participantEntryAcknowledged() {
-    if (consentAcknowledgement.checked) return true;
-
-    showAccessStatus(
-      "Please confirm the consent and participant-instructions acknowledgement before continuing.",
-      "error"
-    );
-    return false;
-  }
-
-  async function authorizeAccessCode() {
-    if (!participantEntryAcknowledged()) return null;
-    if (!validateSetupFields()) return null;
-
-    const accessCode = getAccessCode();
-
-    continueBtn.disabled = true;
-    showAccessStatus("Checking access code...", "");
-
-    try {
-      const response = await fetch(WORKER_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          action: "authorize",
-          subject_code: getSubjectCode(),
-          access_code: accessCode
-        })
-      });
-
-      let data = null;
-      try {
-        data = await response.json();
-      } catch (_) {
-        data = null;
-      }
-
-      if (!response.ok || !data?.valid) {
-        showAccessStatus("Access code not recognised.", "error");
-        return null;
-      }
-
-      if (data.complete === true) {
-        showAccessStatus(
-          "All writing tasks for this participant have already been completed.",
-          "ok"
-        );
-        return null;
-      }
-
-      const condition =
-        typeof data?.condition === "string"
-          ? data.condition.toLowerCase()
-          : "";
-
-      const taskNumber = Number(data?.task_number);
-
-      if (
-        !["ah", "ih", "nh", "al", "il", "nl"].includes(condition) ||
-        ![1, 2].includes(taskNumber)
-      ) {
-        showAccessStatus("Participant sequence configuration error.", "error");
-        return null;
-      }
-
-      // A task that is already in progress must not silently restart with a fresh timer.
-      // Normal Gamma Task 1 -> Questionnaire -> Task 2 return occurs before Task 2 starts,
-      // so this does not interfere with the intended between-task workflow.
-      if (data.started === true) {
-        showAccessStatus(
-          "Task " + taskNumber +
-          " has already been started. Please contact the researcher before continuing.",
-          "error"
-        );
-        return null;
-      }
-
-      activeAccessCode = accessCode;
-      activeTaskNumber = taskNumber;
-      serverTaskStartedAt = data.started_at || null;
-
-      showAccessStatus(
-        "Access code accepted. Task " + activeTaskNumber + " is ready.",
-        "ok"
-      );
-
-      return condition;
-
-    } catch (error) {
-      showAccessStatus(
-        "Could not verify the access code. Please check the internet connection and try again.",
-        "error"
-      );
-      return null;
-
-    } finally {
-      updateParticipantEntryGate();
-    }
-  }
-
-  function showReadyTask(condition, restored = false) {
-    topicCode = condition;
-    planningMode = topicCode[0];
-    familiarity = topicCode[1];
-
-    participantLine.textContent =
-      "Participant: " + getSubjectCode() +
-      " | Task " + activeTaskNumber + " of 2";
-
-    topicText.textContent = TOPICS[familiarity];
-    taskInfo.classList.add("hidden");
-
-    if (planningMode === "a") {
-      experimentPage.className = "dual";
-      aiPanel.classList.remove("hidden");
-      aiPanel.style.display = "";
-    } else {
-      experimentPage.className = "single";
-      aiPanel.classList.add("hidden");
-    }
-
-    if (planningMode === "i") {
-      planningInstruction.classList.remove("hidden");
-      planningInstruction.textContent =
-        "You will have 10 minutes to plan on the paper provided. " +
-        "The writing box will remain locked until the planning period ends.";
-    } else if (planningMode === "a") {
-      planningInstruction.classList.remove("hidden");
-      planningInstruction.textContent =
-        "You will have 10 minutes to plan using the AI tool and the paper provided. " +
-        "The AI interface will close when the writing phase begins.";
-    } else {
-      planningInstruction.classList.add("hidden");
-      planningInstruction.textContent = "";
-    }
-
-    setupPage.classList.add("hidden");
-    experimentPage.classList.remove("hidden");
-
-    resumeBanner.classList.toggle(
-      "hidden",
-      !(restored && activeTaskNumber === 2)
-    );
-
-    phase = "ready";
-    phaseName.textContent = "Ready";
-    mainTimer.textContent =
-      planningMode === "n"
-        ? "Writing time: 30:00"
-        : "Planning time: 10:00";
-
-    aiTimer.textContent = "10:00";
-    zipDownloadInitiated = false;
-    setNextStepAvailability(false);
-    updateWordCountDisplay();
-  }
-
-  async function routeCondition() {
-    const condition = await authorizeAccessCode();
-    if (!condition) return;
-
-    showReadyTask(condition, false);
-  }
-
-  async function attemptTask2Resume() {
-    const params = new URLSearchParams(window.location.search);
-
-    if (params.get("resume") !== "task2") return;
-
-    const saved = readGammaSession();
-
-    // Remove the resume marker from the visible URL after reading it.
-    window.history.replaceState(
-      {},
-      document.title,
-      window.location.pathname
-    );
-
-    if (!saved) {
-      showAccessStatus(
-        "Automatic session recovery was unavailable. Please re-enter your original Subject Code and Access Code.",
-        "error"
-      );
-      return;
-    }
-
-    const subjectDigits = saved.subject_code.slice(1);
-    subjectNumberInput.value = subjectDigits;
-    splitAccessCodeForInputs(saved.access_code);
-
-    continueBtn.disabled = true;
-    showAccessStatus("Restoring Task 2 session...", "");
-
-    try {
-      const response = await fetch(WORKER_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          action: "authorize",
-          subject_code: saved.subject_code,
-          access_code: saved.access_code
-        })
-      });
-
-      let data = null;
-      try {
-        data = await response.json();
-      } catch (_) {
-        data = null;
-      }
-
-      if (!response.ok || !data?.valid) {
-        throw new Error("Session authorization failed.");
-      }
-
-      if (data.complete === true) {
-        clearGammaSession();
-        showAccessStatus(
-          "All writing tasks for this participant have already been completed.",
-          "ok"
-        );
-        return;
-      }
-
-      const condition =
-        typeof data?.condition === "string"
-          ? data.condition.toLowerCase()
-          : "";
-
-      const taskNumber = Number(data?.task_number);
-
-      if (
-        taskNumber !== 2 ||
-        data.started === true ||
-        !["ah", "ih", "nh", "al", "il", "nl"].includes(condition)
-      ) {
-        throw new Error("Task 2 is not available for automatic recovery.");
-      }
-
-      activeAccessCode = saved.access_code;
-      activeTaskNumber = 2;
-      serverTaskStartedAt = data.started_at || null;
-
-      clearGammaSession();
-      showAccessStatus("");
-      showReadyTask(condition, true);
-
-    } catch (error) {
-      clearGammaSession();
-      showAccessStatus(
-        "Automatic session recovery failed. Please re-enter your original Subject Code and Access Code.",
-        "error"
-      );
-    } finally {
-      updateParticipantEntryGate();
-    }
-  }
-
-  consentAcknowledgement.addEventListener("change", () => {
-    updateParticipantEntryGate();
-
-    if (consentAcknowledgement.checked) {
-      subjectNumberInput.focus();
-    }
-  });
-
-  subjectNumberInput.addEventListener("input", () => {
-    subjectNumberInput.value = normaliseSubjectNumber(subjectNumberInput.value);
-    showAccessStatus("");
-  });
-
-  accessCodeAInput.addEventListener("input", () => {
-    accessCodeAInput.value = normaliseAccessPart(accessCodeAInput.value);
-    showAccessStatus("");
-
-    if (accessCodeAInput.value.length === 4) {
-      accessCodeBInput.focus();
-    }
-  });
-
-  accessCodeBInput.addEventListener("input", () => {
-    accessCodeBInput.value = normaliseAccessPart(accessCodeBInput.value);
-    showAccessStatus("");
-  });
-
-  function handleFullAccessCodePaste(event) {
-    const pastedText = event.clipboardData?.getData("text") || "";
-    const compactCode = pastedText
-      .toUpperCase()
-      .replace(/[^A-Z0-9]/g, "");
-
-    if (compactCode.length < 8) return;
-
-    event.preventDefault();
-    accessCodeAInput.value = compactCode.slice(0, 4);
-    accessCodeBInput.value = compactCode.slice(4, 8);
-    showAccessStatus("");
-    accessCodeBInput.focus();
-  }
-
-  accessCodeAInput.addEventListener("paste", handleFullAccessCodePaste);
-  accessCodeBInput.addEventListener("paste", handleFullAccessCodePaste);
-
-  // Warn against accidental refresh/close/navigation while a task is active.
-  // Modern browsers display their own standard warning text.
-  window.addEventListener("beforeunload", (event) => {
-    if (!leaveWarningActive) return;
-
-    event.preventDefault();
-    event.returnValue = "";
-  });
-
-  // ---------------- PHASE CONTROL ----------------
-  async function startServerTask() {
-    if (![1, 2].includes(activeTaskNumber)) {
-      throw new Error("No active Gamma task is available.");
-    }
-
-    const response = await fetch(WORKER_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        action: "start_task",
-        subject_code: getSubjectCode(),
-        access_code: activeAccessCode,
-        task_number: activeTaskNumber
-      })
+  const tabs = Array.from(document.querySelectorAll('.tab'));
+  const views = Array.from(document.querySelectorAll('.view'));
+  const previousBtn = document.getElementById('previousBtn');
+  const nextBtn = document.getElementById('nextBtn');
+  const hashNames = ['consent', 'pls', 'instructions'];
+  let activeIndex = Math.max(0, hashNames.indexOf(location.hash.slice(1)));
+
+  function showView(index, updateHash = true) {
+    activeIndex = Math.max(0, Math.min(index, views.length - 1));
+
+    tabs.forEach((tab, i) => {
+      const active = i === activeIndex;
+      tab.classList.toggle('active', active);
+      tab.setAttribute('aria-selected', String(active));
     });
 
-    let data = null;
-    try {
-      data = await response.json();
-    } catch (_) {
-      data = null;
-    }
-
-    if (!response.ok || !data?.success) {
-      throw new Error(
-        data?.error ||
-        "Could not confirm the task start."
-      );
-    }
-
-    if (
-      Number(data.task_number) !== activeTaskNumber ||
-      String(data.condition || "").toLowerCase() !== topicCode
-    ) {
-      throw new Error("Server task assignment mismatch.");
-    }
-
-    serverTaskStartedAt = data.started_at || null;
-    return data;
-  }
-
-  async function startTask() {
-    if (phase !== "ready") return;
-
-    startBtn.disabled = true;
-    startBtn.textContent = "Starting...";
-
-    try {
-      // Gamma records the specific Task 1 / Task 2 start server-side.
-      // Passing the access screen alone never starts the task.
-      await startServerTask();
-      leaveWarningActive = true;
-
-    } catch (error) {
-      alert(
-        "The task could not be started because the assignment status " +
-        "could not be confirmed. Please check the internet connection and try again."
-      );
-
-      startBtn.disabled = false;
-      startBtn.textContent = "Start Task";
-      return;
-    }
-
-    // The participant has now actively started Task 2, so the restored-session
-    // readiness notice is no longer relevant.
-    resumeBanner.classList.add("hidden");
-
-    // Reveal the assigned topic only after the task start has been confirmed.
-    taskInfo.classList.remove("hidden");
-
-    stopBtn.disabled = true;
-    downloadPackageBtn.disabled = true;
-    planningDurationMs = 0;
-    writingDurationMs = 0;
-    planningEndReason = planningMode === "n" ? "not_applicable" : "";
-    writingEndReason = "";
-    writingBox.value = "";
-    updateWordCountDisplay();
-
-    startBtn.textContent = "Start Task";
-
-    if (planningMode === "n") {
-      beginWriting();
-    } else {
-      beginPlanning();
-    }
-  }
-
-  function beginPlanning() {
-    phase = "planning";
-    phaseStartTime = nowMs();
-    phaseLimitMs = PLANNING_MINUTES * 60 * 1000;
-
-    phaseName.textContent =
-      planningMode === "a" ? "AI planning" : "Self-planning";
-    mainTimer.textContent = "Planning time: 10:00";
-    writingBox.disabled = true;
-
-    endPlanningBtn.classList.remove("hidden");
-    endPlanningBtn.disabled = false;
-
-    if (planningMode === "a") {
-      promptBox.disabled = false;
-      sendBtn.disabled = false;
-      aiStatus.textContent = "AI planning active";
-      promptBox.focus();
-    }
-
-    clearInterval(timerInterval);
-    timerInterval = setInterval(updatePhaseTimer, 200);
-  }
-
-  function endPlanningEarly() {
-    if (phase !== "planning") return;
-
-    planningDurationMs = nowMs() - phaseStartTime;
-    planningEndReason = "ended_early_by_participant";
-    beginWriting();
-  }
-
-  
-function hideAiPanelForWriting() {
-  if (planningMode !== "a") return;
-
-  const aiPanel = document.getElementById("aiPanel");
-  if (aiPanel) {
-    aiPanel.style.display = "none";
-  }
-
-  // Switch the experiment layout from two columns to one full-width writing panel.
-  experimentPage.classList.remove("dual");
-
-  // Stop any AI stream still running at the exact moment planning ends.
-  if (aiAbortController) {
-    aiAbortController.abort();
-    aiAbortController = null;
-  }
-
-  // Hard-disable AI interaction once writing starts.
-  promptBox.disabled = true;
-  sendBtn.disabled = true;
-}
-
-function beginWriting() {
-  hideAiPanelForWriting();
-    if (planningMode === "n") {
-      planningDurationMs = 0;
-      planningEndReason = "not_applicable";
-    }
-
-    endPlanningBtn.disabled = true;
-    endPlanningBtn.classList.add("hidden");
-
-    phase = "writing";
-    phaseStartTime = nowMs();
-    writingStartTime = phaseStartTime;
-    phaseLimitMs = WRITING_MINUTES * 60 * 1000;
-
-    keystrokeLog = [];
-    minuteSnapshots = [];
-    lastSnapshotMinute = 0;
-
-    phaseName.textContent = "Writing";
-    mainTimer.textContent = "Writing time: 30:00";
-
-    // Lock AI interaction after planning, but keep history visible.
-    promptBox.disabled = true;
-    sendBtn.disabled = true;
-    if (planningMode === "a") {
-      aiStatus.textContent = "AI planning ended — chat is now read-only";
-      aiTimer.textContent = "00:00";
-    }
-
-    writingBox.disabled = false;
-    writingBox.focus();
-    stopBtn.disabled = false;
-
-    keystrokeLog.push({
-      subject_code: getSubjectCode(),
-      topic_code: topicCode,
-      task_number: activeTaskNumber,
-      assignment_source: "sequence_access_code",
-      condition: getConditionLabel(),
-      familiarity: familiarity,
-      planning_mode: planningMode,
-      time_ms: "0.00",
-      event: "writing_start",
-      key: "",
-      inputType: "",
-      data: "",
-      cursor_start: 0,
-      cursor_end: 0,
-      word_count: 0
+    views.forEach((view, i) => {
+      view.hidden = i !== activeIndex;
     });
 
-    clearInterval(timerInterval);
-    timerInterval = setInterval(updatePhaseTimer, 200);
+    previousBtn.disabled = activeIndex === 0;
+    nextBtn.disabled = activeIndex === views.length - 1;
+
+    if (updateHash) {
+      history.replaceState(null, '', '#' + hashNames[activeIndex]);
+    }
   }
 
-  async function recordTaskFinishOnServer() {
-    if (![1, 2].includes(activeTaskNumber)) {
-      throw new Error("No active Gamma task is available.");
-    }
-
-    const response = await fetch(WORKER_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        action: "finish_task",
-        subject_code: getSubjectCode(),
-        access_code: activeAccessCode,
-        task_number: activeTaskNumber
-      })
+  tabs.forEach((tab) => {
+    tab.addEventListener('click', () => {
+      showView(Number(tab.dataset.index));
     });
-
-    let data = null;
-    try {
-      data = await response.json();
-    } catch (_) {
-      data = null;
-    }
-
-    if (!response.ok || !data?.success) {
-      throw new Error(
-        data?.error ||
-        "Could not confirm the task finish."
-      );
-    }
-
-    if (Number(data.task_number) !== activeTaskNumber) {
-      throw new Error("Server task-finish mismatch.");
-    }
-
-    return data;
-  }
-
-  function finaliseFinishedUi(autoStopped) {
-    leaveWarningActive = false;
-    phase = "finished";
-    phaseName.textContent = "Finished";
-    mainTimer.textContent =
-      autoStopped ? "Writing time: 00:00" : "Task finished";
-
-    writingBox.disabled = true;
-    promptBox.disabled = true;
-    sendBtn.disabled = true;
-
-    stopBtn.disabled = true;
-    stopBtn.textContent = "Finish";
-    downloadPackageBtn.disabled = false;
-
-    zipDownloadInitiated = false;
-    setNextStepAvailability(false);
-  }
-
-  async function retryPendingFinish() {
-    if (phase !== "finish_pending" || finishRequestInFlight) return;
-
-    finishRequestInFlight = true;
-    stopBtn.disabled = true;
-    stopBtn.textContent = "Retrying...";
-    phaseName.textContent = "Confirming finish";
-
-    try {
-      await recordTaskFinishOnServer();
-      finaliseFinishedUi(pendingFinishAutoStopped);
-    } catch (error) {
-      phase = "finish_pending";
-      phaseName.textContent = "Finish pending";
-      mainTimer.textContent = "Task finish not yet confirmed";
-      stopBtn.disabled = false;
-      stopBtn.textContent = "Retry Finish";
-
-      alert(
-        "The writing task has ended locally, but the server could not confirm the finish. " +
-        "Please check the internet connection and click Retry Finish."
-      );
-    } finally {
-      finishRequestInFlight = false;
-    }
-  }
-
-  async function finishTask(autoStopped = false) {
-    if (phase !== "writing" || finishRequestInFlight) return;
-
-    recordMinuteSnapshotsUpToCurrentTime();
-    addWritingLog(
-      autoStopped ? "writing_end_time_limit" : "writing_end",
-      "", "", ""
-    );
-
-    writingDurationMs = writingElapsedMs();
-    writingEndReason = autoStopped ? "time_limit" : "ended_by_participant";
-    pendingFinishAutoStopped = autoStopped;
-
-    // Freeze the participant-facing task immediately at the real finish moment.
-    phase = "finishing";
-    clearInterval(timerInterval);
-
-    writingBox.disabled = true;
-    promptBox.disabled = true;
-    sendBtn.disabled = true;
-    stopBtn.disabled = true;
-    downloadPackageBtn.disabled = true;
-
-    phaseName.textContent = "Confirming finish";
-    mainTimer.textContent =
-      autoStopped ? "Writing time: 00:00" : "Confirming task finish...";
-
-    finishRequestInFlight = true;
-
-    try {
-      await recordTaskFinishOnServer();
-      finaliseFinishedUi(autoStopped);
-    } catch (error) {
-      // The writing remains frozen so a network problem cannot give extra writing time.
-      // The server endpoint is idempotent, so retrying is safe if the first response was lost.
-      phase = "finish_pending";
-      phaseName.textContent = "Finish pending";
-      mainTimer.textContent = "Task finish not yet confirmed";
-      stopBtn.disabled = false;
-      stopBtn.textContent = "Retry Finish";
-
-      alert(
-        "The writing task has ended locally, but the server could not confirm the finish. " +
-        "Please check the internet connection and click Retry Finish."
-      );
-    } finally {
-      finishRequestInFlight = false;
-    }
-  }
-
-  function updatePhaseTimer() {
-    if (phase !== "planning" && phase !== "writing") return;
-
-    const elapsed = nowMs() - phaseStartTime;
-    const remaining = phaseLimitMs - elapsed;
-
-    if (phase === "planning") {
-      mainTimer.textContent = "Planning time: " + formatRemaining(remaining);
-      if (planningMode === "a") {
-        aiTimer.textContent = formatRemaining(remaining);
-      }
-
-      if (remaining <= 0) {
-        planningDurationMs = nowMs() - phaseStartTime;
-        planningEndReason = "time_limit";
-        beginWriting();
-      }
-    } else if (phase === "writing") {
-      recordMinuteSnapshotsUpToCurrentTime();
-      mainTimer.textContent = "Writing time: " + formatRemaining(remaining);
-
-      if (remaining <= 0) {
-        finishTask(true);
-      }
-    }
-  }
-
-  // ---------------- WRITING LOG ----------------
-  function writingElapsedMs() {
-    return nowMs() - writingStartTime;
-  }
-
-  function addWritingLog(eventType, key, inputType, data) {
-    if (phase !== "writing") return;
-
-    keystrokeLog.push({
-      subject_code: getSubjectCode(),
-      topic_code: topicCode,
-      task_number: activeTaskNumber,
-      condition: getConditionLabel(),
-      familiarity: familiarity,
-      planning_mode: planningMode,
-      time_ms: writingElapsedMs().toFixed(2),
-      event: eventType,
-      key: key || "",
-      inputType: inputType || "",
-      data: data || "",
-      cursor_start: writingBox.selectionStart,
-      cursor_end: writingBox.selectionEnd,
-      word_count: countWords(writingBox.value)
-    });
-  }
-
-  function recordMinuteSnapshotsUpToCurrentTime() {
-    if (phase !== "writing") return;
-
-    const completedMinutes = Math.floor(writingElapsedMs() / 60000);
-
-    while (lastSnapshotMinute < completedMinutes) {
-      lastSnapshotMinute += 1;
-      minuteSnapshots.push({
-        minute: lastSnapshotMinute,
-        word_count: countWords(writingBox.value),
-        text: writingBox.value
-      });
-    }
-  }
-
-  // ---------------- REAL AI + CHAT LOG ----------------
-  function addChatMessage(text, role) {
-    const div = document.createElement("div");
-    div.className = "msg " + role;
-
-    if (role === "ai") {
-      renderMarkdownInto(div, text);
-    } else {
-      div.textContent = text;
-    }
-
-    chatMessages.appendChild(div);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
-    return div;
-  }
-
-  function renderMarkdownInto(element, markdownText) {
-    if (
-      window.marked &&
-      typeof window.marked.parse === "function" &&
-      window.DOMPurify
-    ) {
-      const rawHtml = window.marked.parse(markdownText || "");
-      element.innerHTML = window.DOMPurify.sanitize(rawHtml);
-    } else {
-      element.textContent = markdownText || "";
-    }
-  }
-
-  function buildApiMessages() {
-    return chatLog
-      .filter(item => item.role === "user" || item.role === "assistant")
-      .map(item => ({
-        role: item.role,
-        content: item.text
-      }));
-  }
-
-  async function sendPrompt() {
-    if (phase !== "planning" || planningMode !== "a") return;
-    if (aiRequestInFlight) return;
-
-    const text = promptBox.value.trim();
-    if (!text) return;
-
-    if (!WORKER_URL) {
-      alert("The Cloudflare Worker URL has not been configured yet.");
-      return;
-    }
-
-    const requestStartedAt = nowMs();
-    const promptTime = (requestStartedAt - phaseStartTime).toFixed(2);
-
-    addChatMessage(text, "user");
-    chatLog.push({
-      role: "user",
-      time_ms: promptTime,
-      text: text
-    });
-
-    promptBox.value = "";
-    aiRequestInFlight = true;
-    sendBtn.disabled = true;
-    promptBox.disabled = true;
-    aiStatus.textContent = "AI is responding...";
-
-    aiAbortController = new AbortController();
-
-    let fullText = "";
-    let firstTokenLatencyMs = null;
-    let aiBubble = null;
-    let latestResponseMeta = null;
-    let renderScheduled = false;
-
-    const scheduleRender = () => {
-      if (!aiBubble || renderScheduled) return;
-      renderScheduled = true;
-      setTimeout(() => {
-        renderScheduled = false;
-        if (phase === "planning" && aiBubble) {
-          renderMarkdownInto(aiBubble, fullText);
-          chatMessages.scrollTop = chatMessages.scrollHeight;
-        }
-      }, 60);
-    };
-
-    try {
-      const response = await fetch(WORKER_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          subject_code: getSubjectCode(),
-          access_code: activeAccessCode,
-          messages: buildApiMessages()
-        }),
-        signal: aiAbortController.signal
-      });
-
-      if (!response.ok) {
-        let message = "The AI request failed.";
-        try {
-          const data = await response.json();
-          message =
-            typeof data?.error === "string"
-              ? data.error
-              : data?.error?.message
-                ? data.error.message
-                : JSON.stringify(data?.error || data);
-        } catch (_) {
-          const raw = await response.text().catch(() => "");
-          if (raw) message = raw;
-        }
-        throw new Error(message);
-      }
-
-      if (!response.body) {
-        throw new Error("Streaming response body is unavailable.");
-      }
-
-      // Create an empty assistant bubble as soon as the HTTP stream opens.
-      if (phase === "planning") {
-        aiBubble = addChatMessage("", "ai");
-      }
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let sseBuffer = "";
-
-      const handleEvent = (event) => {
-        if (!event || typeof event !== "object") return;
-
-        if (event.type === "response.output_text.delta") {
-          if (firstTokenLatencyMs === null) {
-            firstTokenLatencyMs = nowMs() - requestStartedAt;
-          }
-
-          if (typeof event.delta === "string") {
-            fullText += event.delta;
-            scheduleRender();
-          }
-        } else if (event.type === "response.completed") {
-          latestResponseMeta = event.response || null;
-        } else if (event.type === "error") {
-          throw new Error(
-            event?.error?.message ||
-            event?.message ||
-            "OpenAI streaming error."
-          );
-        }
-      };
-
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-
-        sseBuffer += decoder.decode(value, { stream: true });
-
-        // OpenAI SSE events are separated by a blank line.
-        const blocks = sseBuffer.split(/\r?\n\r?\n/);
-        sseBuffer = blocks.pop() || "";
-
-        for (const block of blocks) {
-          const dataLines = block
-            .split(/\r?\n/)
-            .filter(line => line.startsWith("data:"))
-            .map(line => line.slice(5).trim());
-
-          if (!dataLines.length) continue;
-
-          const payload = dataLines.join("\n");
-          if (!payload || payload === "[DONE]") continue;
-
-          try {
-            handleEvent(JSON.parse(payload));
-          } catch (parseOrStreamError) {
-            if (parseOrStreamError instanceof SyntaxError) {
-              // Ignore malformed/non-JSON SSE payloads rather than breaking the task.
-              continue;
-            }
-            throw parseOrStreamError;
-          }
-        }
-      }
-
-      // Final full Markdown render.
-      if (phase === "planning" && aiBubble) {
-        renderMarkdownInto(aiBubble, fullText);
-        chatMessages.scrollTop = chatMessages.scrollHeight;
-      }
-
-      const requestCompletedAt = nowMs();
-      const responseTime = (requestCompletedAt - phaseStartTime).toFixed(2);
-
-      if (!fullText.trim()) {
-        throw new Error("The AI service returned no text.");
-      }
-
-      chatLog.push({
-        role: "assistant",
-        time_ms: responseTime,
-        text: fullText,
-        first_token_latency_ms:
-          firstTokenLatencyMs === null ? null : Number(firstTokenLatencyMs.toFixed(2)),
-        total_response_latency_ms:
-          Number((requestCompletedAt - requestStartedAt).toFixed(2)),
-        model: latestResponseMeta?.model || null,
-        usage: latestResponseMeta?.usage || null,
-        stream_completed: true
-      });
-
-    } catch (error) {
-      const interruptedByPlanningEnd =
-        error?.name === "AbortError" && phase !== "planning";
-
-      if (interruptedByPlanningEnd) {
-        // Preserve whatever the participant actually saw during planning.
-        if (fullText.trim()) {
-          chatLog.push({
-            role: "assistant",
-            time_ms: (nowMs() - phaseStartTime).toFixed(2),
-            text: fullText,
-            first_token_latency_ms:
-              firstTokenLatencyMs === null ? null : Number(firstTokenLatencyMs.toFixed(2)),
-            total_response_latency_ms:
-              Number((nowMs() - requestStartedAt).toFixed(2)),
-            stream_completed: false,
-            interrupted_at_planning_end: true
-          });
-        }
-      } else {
-        const errorText =
-          "AI request error: " + (error?.message || String(error));
-
-        if (phase === "planning") {
-          if (aiBubble && !fullText.trim()) {
-            aiBubble.textContent = errorText;
-          } else {
-            addChatMessage(errorText, "ai");
-          }
-        }
-
-        chatLog.push({
-          role: "system_error",
-          time_ms: (nowMs() - phaseStartTime).toFixed(2),
-          text: errorText
-        });
-      }
-
-    } finally {
-      aiRequestInFlight = false;
-      aiAbortController = null;
-
-      if (phase === "planning" && planningMode === "a") {
-        promptBox.disabled = false;
-        sendBtn.disabled = false;
-        aiStatus.textContent = "AI planning active";
-        promptBox.focus();
-      } else {
-        promptBox.disabled = true;
-        sendBtn.disabled = true;
-      }
-    }
-  }
-
-  // ---------------- EXPORT ----------------
-  function downloadFile(content, filename, mimeType) {
-    const blob = new Blob([content], { type: mimeType });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
-  function getBaseFilename() {
-    return (
-      sanitizeFilename(getSubjectCode() || "participant") +
-      "_task" +
-      sanitizeFilename(activeTaskNumber ?? "x") +
-      "_" +
-      sanitizeFilename(topicCode || "condition")
-    );
-  }
-
-  function makeCSV() {
-    const headers = [
-      "subject_code",
-      "topic_code",
-      "task_number",
-      "condition",
-      "familiarity",
-      "planning_mode",
-      "time_ms",
-      "event",
-      "key",
-      "inputType",
-      "data",
-      "cursor_start",
-      "cursor_end",
-      "word_count"
-    ];
-
-    function escapeCSV(value) {
-      const str = String(value ?? "");
-      return '"' + str.replace(/"/g, '""') + '"';
-    }
-
-    const rows = keystrokeLog.map(row =>
-      headers.map(h => escapeCSV(row[h])).join(",")
-    );
-
-    return headers.join(",") + "\n" + rows.join("\n");
-  }
-
-  function makeMinuteSnapshotTXT() {
-    const lines = [];
-
-    lines.push("Subject code: " + getSubjectCode());
-    lines.push("Topic code: " + topicCode);
-    lines.push("Task number: " + (activeTaskNumber ?? ""));
-    lines.push("Condition: " + getConditionLabel());
-    lines.push("");
-
-    if (minuteSnapshots.length === 0) {
-      lines.push("No full-minute snapshots were recorded.");
-      return lines.join("\n");
-    }
-
-    minuteSnapshots.forEach(snapshot => {
-      lines.push("=== Minute " + snapshot.minute + " ===");
-      lines.push("Word count: " + snapshot.word_count);
-      lines.push("");
-      lines.push(snapshot.text);
-      lines.push("");
-    });
-
-    return lines.join("\n");
-  }
-
-  function downloadCSV() {
-    if (phase !== "finished") return;
-    downloadFile(makeCSV(), getBaseFilename() + "_keystroke_log.csv", "text/csv");
-  }
-
-  function downloadTXT() {
-    if (phase !== "finished") return;
-    downloadFile(writingBox.value, getBaseFilename() + "_final_text.txt", "text/plain");
-  }
-
-  function downloadMinuteTXT() {
-    if (phase !== "finished") return;
-    downloadFile(
-      makeMinuteSnapshotTXT(),
-      getBaseFilename() + "_minute_snapshots.txt",
-      "text/plain"
-    );
-  }
-
-  function downloadChat() {
-    if (phase !== "finished" || planningMode !== "a") return;
-
-    const payload = {
-      subject_code: getSubjectCode(),
-      topic_code: topicCode,
-      task_number: activeTaskNumber,
-      condition: getConditionLabel(),
-      planning_minutes: PLANNING_MINUTES,
-      chat: chatLog
-    };
-
-    downloadFile(
-      JSON.stringify(payload, null, 2),
-      getBaseFilename() + "_chat_log.json",
-      "application/json"
-    );
-  }
-
-
-  function makeMetadataObject() {
-    return {
-      subject_code: getSubjectCode(),
-      topic_code: topicCode,
-      task_number: activeTaskNumber,
-      condition: getConditionLabel(),
-      planning_mode: planningMode,
-      familiarity: familiarity,
-      topic: TOPICS[familiarity],
-      planned_planning_limit_seconds:
-        planningMode === "n" ? 0 : PLANNING_MINUTES * 60,
-      actual_planning_time_ms: Number(planningDurationMs.toFixed(2)),
-      actual_planning_time_seconds: Number((planningDurationMs / 1000).toFixed(3)),
-      planning_end_reason: planningEndReason,
-      planned_writing_limit_seconds: WRITING_MINUTES * 60,
-      actual_writing_time_ms: Number(writingDurationMs.toFixed(2)),
-      actual_writing_time_seconds: Number((writingDurationMs / 1000).toFixed(3)),
-      writing_end_reason: writingEndReason,
-      final_word_count: countWords(writingBox.value),
-      ai_provider: planningMode === "a" ? "OpenAI" : null,
-      ai_access_method: planningMode === "a" ? "Cloudflare Worker proxy" : null
-    };
-  }
-
-  async function downloadDataPackage() {
-    if (phase !== "finished") return;
-
-    if (typeof JSZip === "undefined") {
-      alert("The ZIP library could not be loaded. Please check the internet connection and reload the page.");
-      return;
-    }
-
-    downloadPackageBtn.disabled = true;
-    const originalLabel = downloadPackageBtn.textContent;
-    downloadPackageBtn.textContent = "Preparing ZIP...";
-
-    try {
-      const zip = new JSZip();
-      const base = getBaseFilename();
-
-      zip.file(base + "_final_text.txt", writingBox.value);
-      zip.file(base + "_keystroke_log.csv", makeCSV());
-      zip.file(base + "_minute_snapshots.txt", makeMinuteSnapshotTXT());
-      zip.file(
-        base + "_metadata.json",
-        JSON.stringify(makeMetadataObject(), null, 2)
-      );
-
-      if (planningMode === "a") {
-        const chatPayload = {
-          subject_code: getSubjectCode(),
-          topic_code: topicCode,
-          task_number: activeTaskNumber,
-          condition: getConditionLabel(),
-          planning_minutes: PLANNING_MINUTES,
-          ai_provider: "OpenAI",
-          ai_access_method: "Cloudflare Worker proxy",
-          chat: chatLog
-        };
-
-        zip.file(
-          base + "_chat_log.json",
-          JSON.stringify(chatPayload, null, 2)
-        );
-      }
-
-      const blob = await zip.generateAsync({
-        type: "blob",
-        compression: "DEFLATE",
-        compressionOptions: { level: 6 }
-      });
-
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = base + "_data_package.zip";
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-
-      // At this point the ZIP was successfully generated and the browser download was triggered.
-      // A normal web page cannot verify the file's final presence on disk, so the next modal
-      // asks the participant to confirm that it has been saved locally.
-      zipDownloadInitiated = true;
-      setNextStepAvailability(true);
-
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-    } catch (err) {
-      console.error(err);
-      alert("Could not create the ZIP file. Please try again.");
-    } finally {
-      downloadPackageBtn.textContent = originalLabel;
-      downloadPackageBtn.disabled = false;
-    }
-  }
-
-
-  function continueToNextStep() {
-    if (
-      phase !== "finished" ||
-      !zipDownloadInitiated ||
-      ![1, 2].includes(activeTaskNumber)
-    ) {
-      return;
-    }
-
-    if (activeTaskNumber === 1) {
-      // Save the original server-validated credentials only in this tab's sessionStorage.
-      // They are used solely to re-authorize Task 2 when Survey A redirects back.
-      saveGammaSessionForReturn();
-
-      const questionnaireUrl = buildTask1QuestionnaireUrl();
-
-      closeNextStepModal();
-
-      // replace() reduces ordinary browser-history return to the completed writing page.
-      window.location.replace(questionnaireUrl);
-      return;
-    }
-
-    if (activeTaskNumber === 2) {
-      const questionnaireUrl = buildTask2QuestionnaireUrl();
-
-      // No Gamma return is expected after the final questionnaire chain.
-      clearGammaSession();
-      closeNextStepModal();
-
-      // replace() reduces ordinary browser-history return to the completed writing task.
-      window.location.replace(questionnaireUrl);
-    }
-  }
-
-  // ---------------- EVENTS ----------------
-  continueBtn.addEventListener("click", routeCondition);
-  accessCodeBInput.addEventListener("keydown", function(e) {
-    if (e.key === "Enter" && !continueBtn.disabled) {
-      e.preventDefault();
-      routeCondition();
-    }
-  });
-  startBtn.addEventListener("click", startTask);
-  endPlanningBtn.addEventListener("click", endPlanningEarly);
-  stopBtn.addEventListener("click", () => {
-    if (phase === "finish_pending") {
-      retryPendingFinish();
-    } else {
-      finishTask(false);
-    }
   });
 
-  downloadPackageBtn.addEventListener("click", downloadDataPackage);
-  nextStepBtn.addEventListener("click", openNextStepModal);
-  cancelNextStepBtn.addEventListener("click", closeNextStepModal);
-  confirmNextStepBtn.addEventListener("click", continueToNextStep);
+  previousBtn.addEventListener('click', () => showView(activeIndex - 1));
+  nextBtn.addEventListener('click', () => showView(activeIndex + 1));
 
-  nextStepModal.addEventListener("click", event => {
-    if (event.target === nextStepModal) {
-      closeNextStepModal();
-    }
+  window.addEventListener('hashchange', () => {
+    const index = hashNames.indexOf(location.hash.slice(1));
+    if (index >= 0) showView(index, false);
   });
 
-  sendBtn.addEventListener("click", sendPrompt);
-
-  promptBox.addEventListener("keydown", function(e) {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      sendPrompt();
-    }
-  });
-
-  writingBox.addEventListener("keydown", function(e) {
-    if (phase !== "writing") return;
-    addWritingLog("keydown", e.key, "", "");
-  });
-
-  writingBox.addEventListener("beforeinput", function(e) {
-    if (phase !== "writing") return;
-    addWritingLog("beforeinput", "", e.inputType, e.data);
-  });
-
-  writingBox.addEventListener("input", function(e) {
-    if (phase !== "writing") return;
-    updateWordCountDisplay();
-    addWritingLog("input", "", e.inputType, e.data);
-  });
-
-  // Keep participant information locked until the acknowledgement is confirmed.
-  updateParticipantEntryGate();
-
-  // If Survey A has redirected back to /gamma/?resume=task2,
-  // attempt a silent server re-authorization using this tab's temporary Gamma session.
-  attemptTask2Resume();
-
+  showView(activeIndex, false);
 </script>
 </body>
 </html>
